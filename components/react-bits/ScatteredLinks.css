@@ -220,16 +220,16 @@
   letter-spacing: 1px;
 }
 
-@media (max-width: 1200px) {
-  .scattered-stage { column-count: 4; }
+@media (max-width: 1400px) {
+  .scattered-stage { column-count: 3; column-gap: 10px; }
 }
 
-@media (max-width: 900px) {
-  .scattered-stage { column-count: 3; }
-}
-
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .scattered-stage { column-count: 2; column-gap: 10px; padding: 4px; }
+}
+
+@media (max-width: 500px) {
+  .scattered-stage { column-count: 1; column-gap: 0; padding: 4px; }
   .scattered-pagination { gap: 6px; margin-top: 24px; padding: 12px 0; }
   .scattered-page-btn { width: 36px; height: 36px; }
   .scattered-page-num { min-width: 34px; height: 34px; font-size: 13px; }

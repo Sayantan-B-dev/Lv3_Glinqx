@@ -1,11 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql from '@/lib/db';
+import { query } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/auth';
 import { apiHandler } from '@/lib/api-utils';
 import { generateShortCode } from '@/lib/shortCode';
 import { gamificationService } from '@/services/gamification.service';
 import { resolveUrl, checkDuplicate } from '@/lib/resolveUrl';
 import { LIMITS } from '@/lib/limits';
+
+function buildWhere(opts: {
+  uid: string | null; tag?: string | null; domain?: string | null;
+  query?: string | null; topic?: string | null; topicType?: string | null;
+}) {
+  const parts: string[] = [];
+  const p: any[] = [];
+  let n = 0;
+
+  if (opts.domain) {
+    parts.push(`(l.original_url LIKE $${n + 1} OR l.original_url LIKE $${n + 2})`);
+    p.push('%//' + opts.domain + '%', '%//%.' + opts.domain + '%');
+    n += 2;
+  }
+  if (opts.query) {
+    parts.push(`(LOWER(l.title) LIKE $${n + 1} OR LOWER(t.name) LIKE $${n + 2})`);
+    p.push('%' + opts.query + '%', '%' + opts.query + '%');
+    n += 2;
+  }
+  if (opts.topic) {
+    parts.push(`l.topic_id = (SELECT id FROM topics WHERE slug = $${n + 1})`);
+    p.push(opts.topic);
+    n++;
+  }
+  if (opts.topicType) {
+    parts.push(`l.topic_id IN (SELECT id FROM topics WHERE parent_id = (SELECT id FROM topics WHERE slug = $${n + 1}))`);
+    p.push(opts.topicType);
+    n++;
+  }
+
+  parts.push(`(l.visibility = 'public'
+    OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = $${n + 1} AND followee_id = l.user_id))
+    OR (l.visibility = 'private' AND l.user_id = $${n + 2}))`);
+  p.push(opts.uid, opts.uid);
+
+  return { text: parts.join('\n    AND '), params: p };
+}
 
 export const GET = apiHandler(async (req: NextRequest) => {
   const session = await getSessionFromRequest(req);
@@ -19,88 +57,14 @@ export const GET = apiHandler(async (req: NextRequest) => {
   const topicType = sp.get('topicType');
   const domain = sp.get('domain');
   const sort   = sp.get('sort') ?? 'hot';
-  const query  = sp.get('q')?.toLowerCase();
+  const q      = sp.get('q')?.toLowerCase();
 
   const uid = session?.user_id ?? null;
-
-  const topicFilter = topic ? sql`AND l.topic_id = (SELECT id FROM topics WHERE slug = ${topic})` : sql`AND 1=1`;
 
   let rows: any[] = [];
   let total = 0;
 
-  if (domain) {
-    [{ count: total }] = await sql`
-      SELECT COUNT(*)::int AS count
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      WHERE (l.original_url LIKE ${'%//' + domain + '%'} OR l.original_url LIKE ${'%//%.' + domain + '%'})
-        AND (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-        ${topicFilter}
-    `;
-    rows = await sql`
-      SELECT l.id, l.title, l.description, l.original_url, l.short_code,
-             l.preview_image, l.is_anonymous, l.like_count, l.visibility,
-             EXISTS (
-               SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = ${uid}
-             ) AS liked_by_user,
-             l.comment_count, l.view_count, l.created_at,
-             u.username, u.avatar_url,
-             ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags,
-             t3.slug AS topic, t3.name AS topic_name, t3.color AS topic_color
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      LEFT JOIN link_tags lt ON lt.link_id = l.id
-      LEFT JOIN tags t ON t.id = lt.tag_id
-      LEFT JOIN topics t3 ON l.topic_id = t3.id
-      WHERE (l.original_url LIKE ${'%//' + domain + '%'} OR l.original_url LIKE ${'%//%.' + domain + '%'})
-        AND (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-        ${topicFilter}
-      GROUP BY l.id, u.username, u.avatar_url, t3.slug, t3.name, t3.color
-      ORDER BY l.created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
-  } else if (query) {
-    [{ count: total }] = await sql`
-      SELECT COUNT(*)::int AS count
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      LEFT JOIN link_tags lt ON lt.link_id = l.id
-      LEFT JOIN tags t ON t.id = lt.tag_id
-      WHERE (LOWER(l.title) LIKE ${'%' + query + '%'} OR LOWER(t.name) LIKE ${'%' + query + '%'})
-        AND (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-        ${topicFilter}
-    `;
-    rows = await sql`
-      SELECT l.id, l.title, l.description, l.original_url, l.short_code,
-             l.preview_image, l.is_anonymous, l.like_count, l.visibility,
-             EXISTS (
-               SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = ${uid}
-             ) AS liked_by_user,
-             l.comment_count, l.view_count, l.created_at,
-             u.username, u.avatar_url,
-             ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags,
-             t3.slug AS topic, t3.name AS topic_name, t3.color AS topic_color
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      LEFT JOIN link_tags lt ON lt.link_id = l.id
-      LEFT JOIN tags t ON t.id = lt.tag_id
-      LEFT JOIN topics t3 ON l.topic_id = t3.id
-      WHERE (LOWER(l.title) LIKE ${'%' + query + '%'} OR LOWER(t.name) LIKE ${'%' + query + '%'})
-        AND (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-        ${topicFilter}
-      GROUP BY l.id, u.username, u.avatar_url, t3.slug, t3.name, t3.color
-      ORDER BY l.like_count DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
-  } else if (tab === 'following' && session) {
+  if (tab === 'following' && session) {
     [{ count: total }] = await sql`
       SELECT COUNT(*)::int AS count
       FROM links l
@@ -166,205 +130,50 @@ export const GET = apiHandler(async (req: NextRequest) => {
       ORDER BY l.like_count DESC
       LIMIT ${limit} OFFSET ${offset}
     `;
-  } else if (topic) {
-    [{ count: total }] = await sql`
-      SELECT COUNT(*)::int AS count
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      WHERE l.topic_id = (SELECT id FROM topics WHERE slug = ${topic})
-        AND (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-    `;
-    rows = await sql`
-      SELECT l.id, l.title, l.description, l.original_url, l.short_code,
-             l.preview_image, l.is_anonymous, l.like_count, l.visibility,
-             EXISTS (
-               SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = ${uid}
-             ) AS liked_by_user,
-             l.comment_count, l.view_count, l.created_at,
-             u.username, u.avatar_url,
-             ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags,
-             t3.slug AS topic, t3.name AS topic_name, t3.color AS topic_color
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      LEFT JOIN link_tags lt ON lt.link_id = l.id
-      LEFT JOIN tags t ON t.id = lt.tag_id
-      LEFT JOIN topics t3 ON l.topic_id = t3.id
-      WHERE l.topic_id = (SELECT id FROM topics WHERE slug = ${topic})
-        AND (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-      GROUP BY l.id, u.username, u.avatar_url, t3.slug, t3.name, t3.color
-      ORDER BY l.created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
-  } else if (topicType) {
-    [{ count: total }] = await sql`
-      SELECT COUNT(*)::int AS count
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      WHERE l.topic_id IN (SELECT id FROM topics WHERE parent_id = (SELECT id FROM topics WHERE slug = ${topicType}))
-        AND (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-    `;
-    rows = await sql`
-      SELECT l.id, l.title, l.description, l.original_url, l.short_code,
-             l.preview_image, l.is_anonymous, l.like_count, l.visibility,
-             EXISTS (
-               SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = ${uid}
-             ) AS liked_by_user,
-             l.comment_count, l.view_count, l.created_at,
-             u.username, u.avatar_url,
-             ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags,
-             t3.slug AS topic, t3.name AS topic_name, t3.color AS topic_color
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      LEFT JOIN link_tags lt ON lt.link_id = l.id
-      LEFT JOIN tags t ON t.id = lt.tag_id
-      LEFT JOIN topics t3 ON l.topic_id = t3.id
-      WHERE l.topic_id IN (SELECT id FROM topics WHERE parent_id = (SELECT id FROM topics WHERE slug = ${topicType}))
-        AND (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-      GROUP BY l.id, u.username, u.avatar_url, t3.slug, t3.name, t3.color
-      ORDER BY l.created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
-  } else if (sort === 'top') {
-    [{ count: total }] = await sql`
-      SELECT COUNT(*)::int AS count
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      LEFT JOIN link_tags lt ON lt.link_id = l.id
-      LEFT JOIN tags t ON t.id = lt.tag_id
-      WHERE (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-    `;
-    rows = await sql`
-      SELECT l.id, l.title, l.description, l.original_url, l.short_code,
-             l.preview_image, l.is_anonymous, l.like_count, l.visibility,
-             EXISTS (
-               SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = ${uid}
-             ) AS liked_by_user,
-             l.comment_count, l.view_count, l.created_at,
-             u.username, u.avatar_url,
-             ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags,
-             t3.slug AS topic, t3.name AS topic_name, t3.color AS topic_color
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      LEFT JOIN link_tags lt ON lt.link_id = l.id
-      LEFT JOIN tags t ON t.id = lt.tag_id
-      LEFT JOIN topics t3 ON l.topic_id = t3.id
-      WHERE (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-      GROUP BY l.id, u.username, u.avatar_url, t3.slug, t3.name, t3.color
-      ORDER BY l.like_count DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
-  } else if (sort === 'oldest') {
-    [{ count: total }] = await sql`
-      SELECT COUNT(*)::int AS count
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      LEFT JOIN link_tags lt ON lt.link_id = l.id
-      LEFT JOIN tags t ON t.id = lt.tag_id
-      WHERE (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-    `;
-    rows = await sql`
-      SELECT l.id, l.title, l.description, l.original_url, l.short_code,
-             l.preview_image, l.is_anonymous, l.like_count, l.visibility,
-             EXISTS (
-               SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = ${uid}
-             ) AS liked_by_user,
-             l.comment_count, l.view_count, l.created_at,
-             u.username, u.avatar_url,
-             ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags,
-             t3.slug AS topic, t3.name AS topic_name, t3.color AS topic_color
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      LEFT JOIN link_tags lt ON lt.link_id = l.id
-      LEFT JOIN tags t ON t.id = lt.tag_id
-      LEFT JOIN topics t3 ON l.topic_id = t3.id
-      WHERE (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-      GROUP BY l.id, u.username, u.avatar_url, t3.slug, t3.name, t3.color
-      ORDER BY l.created_at ASC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
-  } else if (sort === 'new') {
-    [{ count: total }] = await sql`
-      SELECT COUNT(*)::int AS count
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      LEFT JOIN link_tags lt ON lt.link_id = l.id
-      LEFT JOIN tags t ON t.id = lt.tag_id
-      WHERE (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-    `;
-    rows = await sql`
-      SELECT l.id, l.title, l.description, l.original_url, l.short_code,
-             l.preview_image, l.is_anonymous, l.like_count, l.visibility,
-             EXISTS (
-               SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = ${uid}
-             ) AS liked_by_user,
-             l.comment_count, l.view_count, l.created_at,
-             u.username, u.avatar_url,
-             ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags,
-             t3.slug AS topic, t3.name AS topic_name, t3.color AS topic_color
-      FROM links l
-      JOIN users u ON l.user_id = u.id
-      LEFT JOIN link_tags lt ON lt.link_id = l.id
-      LEFT JOIN tags t ON t.id = lt.tag_id
-      LEFT JOIN topics t3 ON l.topic_id = t3.id
-      WHERE (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-      GROUP BY l.id, u.username, u.avatar_url, t3.slug, t3.name, t3.color
-      ORDER BY l.created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
   } else {
-    [{ count: total }] = await sql`
+    const w = buildWhere({ uid, tag, domain, query: q, topic, topicType });
+
+    const tagJoins = q
+      ? '\n      LEFT JOIN link_tags lt ON lt.link_id = l.id\n      LEFT JOIN tags t ON t.id = lt.tag_id'
+      : '';
+
+    const [{ count: total_ }] = await query(`
       SELECT COUNT(*)::int AS count
       FROM links l
-      JOIN users u ON l.user_id = u.id
-      LEFT JOIN link_tags lt ON lt.link_id = l.id
-      LEFT JOIN tags t ON t.id = lt.tag_id
-      WHERE (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
-    `;
-    rows = await sql`
+      JOIN users u ON l.user_id = u.id${tagJoins}
+      WHERE ${w.text}
+    `, w.params);
+    total = total_;
+
+    const orderBy = sort === 'top'    ? 'l.like_count DESC'
+                  : sort === 'oldest' ? 'l.created_at ASC'
+                  : sort === 'new'    ? 'l.created_at DESC'
+                  :                    'hot_score DESC';
+
+    const hotCol = sort !== 'top' && sort !== 'oldest' && sort !== 'new'
+      ? ',\n             (l.like_count / POWER(EXTRACT(EPOCH FROM (NOW() - l.created_at)) / 3600.0 + 2, 1.2)) AS hot_score'
+      : '';
+
+    rows = await query(`
       SELECT l.id, l.title, l.description, l.original_url, l.short_code,
              l.preview_image, l.is_anonymous, l.like_count, l.visibility,
              EXISTS (
-               SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = ${uid}
+               SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = $${w.params.length + 1}
              ) AS liked_by_user,
              l.comment_count, l.view_count, l.created_at,
              u.username, u.avatar_url,
              ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags,
-             t3.slug AS topic, t3.name AS topic_name, t3.color AS topic_color,
-             (l.like_count / POWER(EXTRACT(EPOCH FROM (NOW() - l.created_at)) / 3600.0 + 2, 1.2)) AS hot_score
+             t3.slug AS topic, t3.name AS topic_name, t3.color AS topic_color${hotCol}
       FROM links l
       JOIN users u ON l.user_id = u.id
       LEFT JOIN link_tags lt ON lt.link_id = l.id
       LEFT JOIN tags t ON t.id = lt.tag_id
       LEFT JOIN topics t3 ON l.topic_id = t3.id
-      WHERE (l.visibility = 'public'
-          OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
-          OR (l.visibility = 'private' AND l.user_id = ${uid}))
+      WHERE ${w.text}
       GROUP BY l.id, u.username, u.avatar_url, t3.slug, t3.name, t3.color
-      ORDER BY hot_score DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+      ORDER BY ${orderBy}
+      LIMIT $${w.params.length + 2} OFFSET $${w.params.length + 3}
+    `, [...w.params, uid, limit, offset]);
   }
 
   return NextResponse.json({ links: rows, total, page, limit });

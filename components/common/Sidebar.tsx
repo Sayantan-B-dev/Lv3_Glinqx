@@ -65,8 +65,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     });
   }
 
-  const allItems = navItems.flatMap(s => s.items);
-
   return (
     <nav id="sidebar" className={`${collapsed ? 'collapsed' : ''}${isOpen ? ' mobile-open' : ''}`}>
       <div className="sidebar-logo" style={{ flexDirection: collapsed ? 'column' : 'row', height: collapsed ? 'auto' : 'var(--header-h)', padding: collapsed ? '12px 0' : '0 16px', gap: collapsed ? '12px' : '10px' }}>
@@ -93,9 +91,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       <div className="sidebar-nav">
         {collapsed ? (
           <div className="collapsed-nav">
-            {allItems.map((item) => (
+            {navItems.flatMap(s => s.items.map(item => ({ ...item, section: s.label }))).map((item) => (
               <Link
-                key={item.id}
+                key={`${item.section}-${item.id}`}
                 href={item.href}
                 className={`collapsed-nav-item ${pathname === item.href ? 'active' : ''}`}
                 onClick={onClose}

@@ -152,7 +152,7 @@ export default function Explore() {
                 )}
               </div>
             )}
-            <ScatteredLinks apiEndpoint={apiEndpoint} />
+            <ScatteredLinks key={apiEndpoint} apiEndpoint={apiEndpoint} />
           </section>
         )}
       </div>

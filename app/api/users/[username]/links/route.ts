@@ -20,34 +20,47 @@ export const GET = apiHandler(async (req: NextRequest, { params }: { params: { u
   const limit = Math.min(200, parseInt(sp.get('limit') ?? '30'));
   const offset = (page - 1) * limit;
   const domain = sp.get('domain');
+  const topicType = sp.get('topicType');
 
   try {
-    const visClause = `(l.visibility = 'public'
-      OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = $2 AND followee_id = l.user_id))
-      OR (l.visibility = 'private' AND l.user_id = $2))`;
+    const conds: string[] = [];
+    const p: any[] = [];
+    let n = 0;
 
-    const domainClause = domain
-      ? ` AND (l.original_url LIKE $5 OR l.original_url LIKE $6)`
-      : '';
-    const params = [username.toLowerCase(), uid, limit, offset];
-    if (domain) params.push(`%//${domain}%`, `%//%.${domain}%`);
+    conds.push(`LOWER(u.username) = $${n + 1}`);
+    p.push(username.toLowerCase());
+    n++;
 
-    const countDomainClause = domain
-      ? ` AND (l.original_url LIKE $3 OR l.original_url LIKE $4)`
-      : '';
-    const countParams = domain
-      ? [username.toLowerCase(), uid, `%//${domain}%`, `%//%.${domain}%`]
-      : [username.toLowerCase(), uid];
+    if (topicType) {
+      conds.push(`l.topic_id IN (SELECT id FROM topics WHERE parent_id = (SELECT id FROM topics WHERE slug = $${n + 1}))`);
+      p.push(topicType);
+      n++;
+    }
+
+    conds.push(`(l.visibility = 'public'
+      OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = $${n + 1} AND followee_id = l.user_id))
+      OR (l.visibility = 'private' AND l.user_id = $${n + 1}))`);
+    p.push(uid);
+    n++;
+
+    if (domain) {
+      conds.push(`(l.original_url LIKE $${n + 1} OR l.original_url LIKE $${n + 2})`);
+      p.push(`%//${domain}%`, `%//%.${domain}%`);
+      n += 2;
+    }
+
+    const where = conds.join('\n  AND ');
 
     const [countRow] = await query(
-      `SELECT COUNT(*)::int AS count FROM links l JOIN users u ON l.user_id = u.id WHERE u.username = $1 AND ${visClause}${countDomainClause}`,
-      countParams
+      `SELECT COUNT(*)::int AS count FROM links l JOIN users u ON l.user_id = u.id WHERE ${where}`,
+      p
     );
 
+    const dataParams = [...p, uid, limit, offset];
     const rows = await query(
       `SELECT l.id, l.title, l.description, l.original_url, l.short_code,
               l.preview_image, l.is_anonymous, l.like_count, l.visibility,
-              EXISTS (SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = $2) AS liked_by_user,
+              EXISTS (SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = $${n + 1}) AS liked_by_user,
               l.comment_count, l.view_count, l.created_at,
               u.username, u.avatar_url,
               ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags
@@ -55,11 +68,11 @@ export const GET = apiHandler(async (req: NextRequest, { params }: { params: { u
        JOIN users u ON l.user_id = u.id
        LEFT JOIN link_tags lt ON lt.link_id = l.id
        LEFT JOIN tags t ON t.id = lt.tag_id
-       WHERE u.username = $1 AND ${visClause}${domainClause}
+       WHERE ${where}
        GROUP BY l.id, u.username, u.avatar_url
        ORDER BY ${orderBy}
-       LIMIT $3 OFFSET $4`,
-      params.slice(0, domain ? 6 : 4)
+       LIMIT $${n + 2} OFFSET $${n + 3}`,
+      dataParams
     );
 
     return NextResponse.json({ links: rows, total: countRow?.count ?? 0, page, limit });

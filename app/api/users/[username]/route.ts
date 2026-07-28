@@ -16,7 +16,7 @@ export const GET = apiHandler(async (req: NextRequest, { params }: { params: { u
            (SELECT COUNT(*)::int FROM follows WHERE followee_id = users.id) AS follower_count,
            (SELECT COUNT(*)::int FROM follows WHERE follower_id = users.id) AS following_count
     FROM users
-    WHERE username = ${username} AND is_banned = false
+    WHERE LOWER(username) = ${username} AND is_banned = false
   `;
 
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });

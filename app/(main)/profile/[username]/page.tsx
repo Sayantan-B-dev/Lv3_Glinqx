@@ -35,6 +35,9 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [categories, setCategories] = useState<{ domain: string; count: number }[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [showCatFilter, setShowCatFilter] = useState(false);
+  const [topicTypes, setTopicTypes] = useState<{ slug: string; name: string; link_count: number }[]>([]);
+  const [activeTopicType, setActiveTopicType] = useState<string | null>(null);
+  const [showTopicFilter, setShowTopicFilter] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showGlobe, setShowGlobe] = useState(true);
   const [fadeIn, setFadeIn] = useState(false);
@@ -42,7 +45,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const dataReady = useRef(false);
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState({ bio: '', avatar_url: '', cover_url: '', website: '' });
+  const [editData, setEditData] = useState({ username: '', bio: '', avatar_url: '', cover_url: '', website: '' });
 
   const [cropState, setCropState] = useState<{ imageSrc: string | null, crop: any, zoom: number, type: 'avatar' | 'cover' | null }>({ imageSrc: null, crop: { x: 0, y: 0 }, zoom: 1, type: null });
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
@@ -62,8 +65,9 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const apiEndpoint = useMemo(() => {
     let url = `/api/users/${cleanUsername}/links?sort=${sortBy}`;
     if (activeCategory) url += `&domain=${encodeURIComponent(activeCategory)}`;
+    if (activeTopicType) url += `&topicType=${encodeURIComponent(activeTopicType)}`;
     return url;
-  }, [cleanUsername, sortBy, activeCategory]);
+  }, [cleanUsername, sortBy, activeCategory, activeTopicType]);
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -71,14 +75,19 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     setFadeIn(false);
     dataReady.current = false;
     try {
-      const [profRes, catRes] = await Promise.all([
+      const catUrl = activeTopicType
+        ? `/api/users/${cleanUsername}/categories?topicType=${encodeURIComponent(activeTopicType)}`
+        : `/api/users/${cleanUsername}/categories`;
+      const [profRes, catRes, topRes] = await Promise.all([
         fetch(`/api/users/${cleanUsername}`, { cache: 'no-store' }),
-        fetch(`/api/users/${cleanUsername}/categories`, { cache: 'no-store' }),
+        fetch(catUrl, { cache: 'no-store' }),
+        fetch('/api/links/topics', { cache: 'no-store' }),
       ]);
       if (profRes.ok) {
         const profData = await profRes.json();
         setProfile(profData.user);
         setEditData({
+          username: profData.user.username || '',
           bio: profData.user.bio || '',
           avatar_url: profData.user.avatar_url || '',
           cover_url: profData.user.cover_url || '',
@@ -88,6 +97,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       if (catRes.ok) {
         const catData = await catRes.json();
         setCategories(catData.categories ?? []);
+      }
+      if (topRes.ok) {
+        const topData = await topRes.json();
+        setTopicTypes(topData.types ?? []);
       }
     } catch (err) {
       console.error('Failed to fetch profile', err);
@@ -153,6 +166,16 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   }, [username]);
 
   useEffect(() => {
+    const catUrl = activeTopicType
+      ? `/api/users/${cleanUsername}/categories?topicType=${encodeURIComponent(activeTopicType)}`
+      : `/api/users/${cleanUsername}/categories`;
+    fetch(catUrl, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.categories) setCategories(data.categories); })
+      .catch(() => {});
+  }, [activeTopicType, cleanUsername]);
+
+  useEffect(() => {
     if (!loading && minTimer.current && dataReady.current) {
       clearTimeout(minTimer.current);
       revealContent();
@@ -172,8 +195,12 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         setProfile({ ...profile, ...data.user });
         setIsEditing(false);
         addToast('Profile updated!', 'success');
+        if (editData.username && editData.username !== cleanUsername) {
+          router.push(`/profile/${editData.username.toLowerCase()}`);
+        }
       } else {
-        addToast('Failed to update profile', 'error');
+        const errData = await res.json().catch(() => ({}));
+        addToast(errData.error || 'Failed to update profile', 'error');
       }
     } catch (err) {
       console.error('Update failed', err);
@@ -269,6 +296,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 </div>
               </div>
 
+              <div className="input-group-v">
+                <label>Username</label>
+                <input value={editData.username} onChange={e => setEditData({...editData, username: e.target.value})} className="auth-input" placeholder="username" />
+              </div>
               <div className="input-group-v">
                 <label>Bio</label>
                 <textarea value={editData.bio} onChange={e => setEditData({...editData, bio: e.target.value})} className="auth-input" style={{ minHeight: '80px' }} />
@@ -387,7 +418,44 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
               )}
             </div>
           )}
-          <ScatteredLinks apiEndpoint={apiEndpoint} />
+          {topicTypes.length > 0 && (
+            <div style={{ marginBottom: '12px' }}>
+              <button
+                onClick={() => setShowTopicFilter(v => !v)}
+                style={{
+                  background: 'none', border: 'none', color: 'var(--text-4)', cursor: 'pointer',
+                  fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 0'
+                }}
+              >
+                <svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24"
+                  style={{ transform: showTopicFilter ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>
+                  <path d="M8 5l8 7-8 7z" />
+                </svg>
+                Filter by topic {activeTopicType && <span style={{ color: 'var(--accent)' }}>({topicTypes.find(t => t.slug === activeTopicType)?.name})</span>}
+              </button>
+              {showTopicFilter && (
+                <div className="filter-bar-scroll" style={{ marginTop: '8px' }}>
+                  <button
+                    className={`cat-filter-chip ${!activeTopicType ? 'active' : ''}`}
+                    onClick={() => setActiveTopicType(null)}
+                  >
+                    All
+                  </button>
+                  {topicTypes.map((t) => (
+                    <button
+                      key={t.slug}
+                      className={`cat-filter-chip ${activeTopicType === t.slug ? 'active' : ''}`}
+                      onClick={() => setActiveTopicType(activeTopicType === t.slug ? null : t.slug)}
+                    >
+                      {t.name}
+                      <span className="cat-filter-count">{t.link_count}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <ScatteredLinks key={apiEndpoint} apiEndpoint={apiEndpoint} />
         </div>
       </div>
       )}

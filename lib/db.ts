@@ -13,42 +13,17 @@ if (useLocal) {
     connectionString: process.env.LOCAL_DATABASE_URL,
   });
 
-  sql = async (
-    strings: TemplateStringsArray,
-    ...values: any[]
-  ) => {
-    let text = "";
+  sql = async (strings: TemplateStringsArray, ...values: any[]) => {
     const params: any[] = [];
+    let text = "";
     let paramIdx = 0;
-
-    const processValue = (val: any): string => {
-      if (val && typeof val === 'object' && Array.isArray(val.strings) && Array.isArray(val.values)) {
-        let inner = '';
-        let innerIdx = 0;
-        val.strings.forEach((s: string, i: number) => {
-          inner += s;
-          if (i < val.values.length) {
-            const v = val.values[i];
-            if (v && typeof v === 'object' && Array.isArray(v.strings) && Array.isArray(v.values)) {
-              inner += processValue(v);
-            } else {
-              paramIdx++;
-              params.push(v);
-              inner += `$${paramIdx}`;
-            }
-          }
-        });
-        return inner;
-      }
-      paramIdx++;
-      params.push(val);
-      return `$${paramIdx}`;
-    };
 
     strings.forEach((str, i) => {
       text += str;
       if (i < values.length) {
-        text += processValue(values[i]);
+        paramIdx++;
+        params.push(values[i]);
+        text += `$${paramIdx}`;
       }
     });
 
