@@ -149,15 +149,6 @@ export default function ScatteredLinks({ links: initialLinks, itemsPerPage = 30,
                   </span>
                 </div>
               </div>
-              {link.preview_image && (
-                <div className="card-preview">
-                  <img
-                    src={link.preview_image}
-                    alt={link.title || ''}
-                    onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMG; }}
-                  />
-                </div>
-              )}
             </div>
           </div>
         ))}
