@@ -23,6 +23,8 @@ export const GET = apiHandler(async (req: NextRequest) => {
 
   const uid = session?.user_id ?? null;
 
+  const topicFilter = topic ? sql`AND l.topic_id = (SELECT id FROM topics WHERE slug = ${topic})` : sql``;
+
   let rows: any[] = [];
   let total = 0;
 
@@ -35,6 +37,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
         AND (l.visibility = 'public'
           OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
           OR (l.visibility = 'private' AND l.user_id = ${uid}))
+        ${topicFilter}
     `;
     rows = await sql`
       SELECT l.id, l.title, l.description, l.original_url, l.short_code,
@@ -55,6 +58,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
         AND (l.visibility = 'public'
           OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
           OR (l.visibility = 'private' AND l.user_id = ${uid}))
+        ${topicFilter}
       GROUP BY l.id, u.username, u.avatar_url, t3.slug, t3.name, t3.color
       ORDER BY l.created_at DESC
       LIMIT ${limit} OFFSET ${offset}
@@ -70,6 +74,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
         AND (l.visibility = 'public'
           OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
           OR (l.visibility = 'private' AND l.user_id = ${uid}))
+        ${topicFilter}
     `;
     rows = await sql`
       SELECT l.id, l.title, l.description, l.original_url, l.short_code,
@@ -90,6 +95,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
         AND (l.visibility = 'public'
           OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows WHERE follower_id = ${uid} AND followee_id = l.user_id))
           OR (l.visibility = 'private' AND l.user_id = ${uid}))
+        ${topicFilter}
       GROUP BY l.id, u.username, u.avatar_url, t3.slug, t3.name, t3.color
       ORDER BY l.like_count DESC
       LIMIT ${limit} OFFSET ${offset}
