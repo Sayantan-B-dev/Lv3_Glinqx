@@ -6,6 +6,7 @@ import NotificationPanel from '@/components/common/NotificationPanel';
 import ConfirmModal from '@/components/common/ConfirmModal';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/context/ToastContext';
+import { useAuth } from '@/context/AuthContext';
 import TopicSelect from '@/components/common/TopicSelect';
 import { LIMITS } from '@/lib/limits';
 
@@ -38,6 +39,7 @@ interface TopicTypeGroup {
 export default function Submit() {
   const router = useRouter();
   const { addToast } = useToast();
+  const { user } = useAuth();
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -236,29 +238,30 @@ export default function Submit() {
               </div>
               <div className="input-group-v">
                 <label>Description *</label>
-                <div className="desc-wrapper">
-                  <textarea
-                    value={metadata.description}
-                    onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
-                    className="sub-input textarea"
-                    required
-                    maxLength={LIMITS.DESC_MAX}
-                  />
-                  <button
-                    type="button"
-                    className="ai-gen-btn"
-                    onClick={handleAiGenerate}
-                    disabled={aiGenerating || !metadata.description.trim()}
-                    title="Generate title & tags from description"
-                  >
-                    {aiGenerating ? (
-                      <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="2" className="spinner"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z" /></svg>
-                    )}
-                  </button>
+                <textarea
+                  value={metadata.description}
+                  onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
+                  className="sub-input textarea"
+                  required
+                  maxLength={LIMITS.DESC_MAX}
+                />
+                <div className="desc-actions">
+                  <span className="char-counter">{metadata.description.length}/{LIMITS.DESC_MAX}</span>
+                  {user?.role === 'admin' || user?.role === 'pro' ? (
+                    <button
+                      type="button"
+                      className="ai-gen-btn"
+                      onClick={handleAiGenerate}
+                      disabled={aiGenerating || !metadata.description.trim()}
+                    >
+                      {aiGenerating ? 'generating...' : 'auto generate'}
+                    </button>
+                  ) : (
+                    <span className="ai-gen-btn ai-gen-btn-locked" title="Pro/Admin only">
+                      auto generate
+                    </span>
+                  )}
                 </div>
-                <span className="char-counter">{metadata.description.length}/{LIMITS.DESC_MAX}</span>
               </div>
               <div className="input-group-v">
                 <label>Tags (comma separated)</label>
