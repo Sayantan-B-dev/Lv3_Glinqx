@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Topbar from '@/components/common/Topbar';
 import NotificationPanel from '@/components/common/NotificationPanel';
 import ConfirmModal from '@/components/common/ConfirmModal';
+import AiGenerateModal from '@/components/common/AiGenerateModal';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
@@ -49,7 +50,7 @@ export default function Submit() {
   const [topicId, setTopicId] = useState('');
   const [topicGroups, setTopicGroups] = useState<TopicTypeGroup[]>([]);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const [aiGenerating, setAiGenerating] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
   const pendingUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -127,30 +128,15 @@ export default function Submit() {
     }
   };
 
-  const handleAiGenerate = async () => {
-    if (!metadata.description.trim()) { addToast('Write a description first', 'error'); return; }
-    setAiGenerating(true);
-    try {
-      const res = await fetch('/api/tools/generate', {
-        method: 'POST',
-        body: JSON.stringify({ content: metadata.description }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMetadata(prev => ({
-          ...prev,
-          title: data.title,
-          tags: data.tags.join(', '),
-        }));
-        addToast('Title & tags generated!', 'success');
-      } else {
-        addToast('AI generation failed', 'error');
-      }
-    } catch {
-      addToast('AI generation failed', 'error');
-    } finally {
-      setAiGenerating(false);
-    }
+  const handleAiGenerated = (result: { title: string; description: string; tags: string }) => {
+    setMetadata(prev => ({
+      ...prev,
+      title: result.title || prev.title,
+      description: result.description || prev.description,
+      tags: result.tags || prev.tags,
+    }));
+    setShowAiModal(false);
+    addToast('Title, description & tags generated!', 'success');
   };
 
   const handleFinalSubmit = async (e: React.FormEvent) => {
@@ -245,24 +231,14 @@ export default function Submit() {
                   required
                   maxLength={LIMITS.DESC_MAX}
                 />
-                <div className="desc-actions">
-                  <span className="char-counter">{metadata.description.length}/{LIMITS.DESC_MAX}</span>
-                  {user?.role === 'admin' || user?.role === 'pro' ? (
-                    <button
-                      type="button"
-                      className="ai-gen-btn"
-                      onClick={handleAiGenerate}
-                      disabled={aiGenerating || !metadata.description.trim()}
-                    >
-                      {aiGenerating ? 'generating...' : 'auto generate'}
-                    </button>
-                  ) : (
-                    <span className="ai-gen-btn ai-gen-btn-locked" title="Pro/Admin only">
-                      auto generate
-                    </span>
-                  )}
-                </div>
+                <span className="char-counter">{metadata.description.length}/{LIMITS.DESC_MAX}</span>
               </div>
+              {(user?.role === 'admin' || user?.role === 'pro') && (
+                <button type="button" className="ai-trigger-btn" onClick={() => setShowAiModal(true)}>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z" /></svg>
+                  AI Auto-Generate
+                </button>
+              )}
               <div className="input-group-v">
                 <label>Tags (comma separated)</label>
                 <input
@@ -312,6 +288,12 @@ export default function Submit() {
           danger
           onConfirm={handleConfirmExit}
           onCancel={() => { setShowExitConfirm(false); pendingUrlRef.current = null; }}
+        />
+      )}
+      {showAiModal && (
+        <AiGenerateModal
+          onGenerated={handleAiGenerated}
+          onCancel={() => setShowAiModal(false)}
         />
       )}
     </>
