@@ -47,6 +47,7 @@ export default function Submit() {
   const [topicId, setTopicId] = useState('');
   const [topicGroups, setTopicGroups] = useState<TopicTypeGroup[]>([]);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
   const pendingUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -121,6 +122,32 @@ export default function Submit() {
     } finally {
       setParsing(false);
       setLoading(false);
+    }
+  };
+
+  const handleAiGenerate = async () => {
+    if (!metadata.description.trim()) { addToast('Write a description first', 'error'); return; }
+    setAiGenerating(true);
+    try {
+      const res = await fetch('/api/tools/generate', {
+        method: 'POST',
+        body: JSON.stringify({ content: metadata.description }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMetadata(prev => ({
+          ...prev,
+          title: data.title,
+          tags: data.tags.join(', '),
+        }));
+        addToast('Title & tags generated!', 'success');
+      } else {
+        addToast('AI generation failed', 'error');
+      }
+    } catch {
+      addToast('AI generation failed', 'error');
+    } finally {
+      setAiGenerating(false);
     }
   };
 
@@ -209,13 +236,28 @@ export default function Submit() {
               </div>
               <div className="input-group-v">
                 <label>Description *</label>
-                <textarea
-                  value={metadata.description}
-                  onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
-                  className="sub-input textarea"
-                  required
-                  maxLength={LIMITS.DESC_MAX}
-                />
+                <div className="desc-wrapper">
+                  <textarea
+                    value={metadata.description}
+                    onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
+                    className="sub-input textarea"
+                    required
+                    maxLength={LIMITS.DESC_MAX}
+                  />
+                  <button
+                    type="button"
+                    className="ai-gen-btn"
+                    onClick={handleAiGenerate}
+                    disabled={aiGenerating || !metadata.description.trim()}
+                    title="Generate title & tags from description"
+                  >
+                    {aiGenerating ? (
+                      <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="2" className="spinner"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z" /></svg>
+                    )}
+                  </button>
+                </div>
                 <span className="char-counter">{metadata.description.length}/{LIMITS.DESC_MAX}</span>
               </div>
               <div className="input-group-v">

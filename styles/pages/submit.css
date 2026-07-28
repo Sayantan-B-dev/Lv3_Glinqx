@@ -87,6 +87,46 @@
   border-radius: 4px;
 }
 
+.desc-wrapper {
+  position: relative;
+}
+
+.desc-wrapper .sub-input.textarea {
+  padding-right: 40px;
+}
+
+.ai-gen-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-4);
+  cursor: pointer;
+  transition: all .15s;
+  padding: 0;
+}
+
+.ai-gen-btn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-2));
+}
+
+.ai-gen-btn:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.ai-gen-btn .spinner { animation: spin 1s linear infinite; }
+
 .submit-preview {
   margin-bottom: 16px;
   border-radius: 8px;
