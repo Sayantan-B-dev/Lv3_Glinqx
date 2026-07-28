@@ -12,6 +12,7 @@
   position: relative;
   max-width: full;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
 }
 
 /* Navigation loading state - shows a spinner while the link detail page loads */
@@ -178,6 +179,9 @@
   margin-bottom: 6px;
   line-height: 1.35;
   letter-spacing: -.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .card-desc {
