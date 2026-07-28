@@ -159,7 +159,7 @@
 - Consistent error responses (no stack traces leaked)
 - API route ownership guards (delete/update only own resources)
 
-## Changelog — 2026-07-20 → 2026-07-22
+## Changelog — 2026-07-20 → 2026-07-28
 
 ### 2026-07-22 — OG parser: Facebook fetching, profile links COUNT fix
 - **Fix** — profile links endpoint (`GET /api/users/[username]/links`) was passing `$3`/`$4` (limit/offset) to the `COUNT(*)` query, which only uses `$1`/`$2` (and `$3`/`$4` for domain). Caused PostgreSQL prepared-statement param mismatch errors (`bind message supplies 4 parameters, but prepared statement "" requires 2`). Separated count params with contiguous numbering.
@@ -171,6 +171,53 @@
 - **Submit form copy** — updated the step-1 heading/subtitle to explain auto-fetching of title, description, image & tag suggestions.
 - **Bulk upload safety** — per-domain concurrency (max 2/hostname prevents rate-limit blocks), 45s time budget guard (gracefully marks remaining items as timeout instead of silent stream cut), admin concurrency raised to 25, short-code retry loop (3 attempts before failing), batch progress events (every 10 URLs reduces stream overhead).
 - **Like/bookmark speed** — optimistic UI updates on LinkCard (toggles icon instantly, reverts on error); removed unnecessary `/api/auth/me` pre-check from bookmark handler (was doubling latency); optimized like API to use DELETE-then-INSERT toggle in 2–3 DB roundtrips instead of 4–5.
+- **Uniform text limits** — enforced max lengths across API + frontend: title 150, description 500, tags 8; fixed card layout overflow from long text.
+
+### 2026-07-25 — Footer personal links
+- **Footer** — added social links (GitHub, Twitter, Website) and "© 2026 Sayantan Bharati. All rights reserved." copyright line.
+
+### 2026-07-28 — AI Generate, Websites page, Card fixes, Responsive layout, Editable username
+
+#### AI Generate (Pro/Admin)
+- **API route** (`POST /api/tools/generate`) — calls Groq (`llama-3.3-70b-versatile`) with 3-key rotation to generate title, description, and tags from a pasted URL/content. Rate-limited (10 req/min per user).
+- **Submit form** — added AI sparkle ✨ button that opens a popup modal with its own textarea (4000 char limit). User pastes content, clicks Generate, and the modal fills the title/description/tags fields on the main form. Gated to `pro`/`admin` roles only.
+- **Responsive modal** — AI popup adapts to mobile with full-screen overlay.
+
+#### Websites page (`/websites`)
+- **Phase 1** — inserted "Website" topic (id=101) under "Web & Cloud" in the curated topic taxonomy + migration script.
+- **Phase 2** — moved "Amazing Websites" from home page to dedicated `/websites` route with full explore-style filters: search, sort (newest/oldest/top), domain category filter.
+- **Phase 3** — removed "Filter by category" section from `/websites`. Fixed topic filter in the websites API to use cumulative WHERE conditions (resolves Neon `sql` fragment incompatibility).
+- **Tools nav** — "Tools" link now visible in sidebar for all authenticated users (was pro/admin only).
+
+#### Card & UI fixes
+- **Preview images** — removed preview image from all `LinkCard` and `ScatteredLinks` surfaces (kept on Random page). Prevents layout shift and reduces bandwidth.
+- **Card overflow** — fixed title text overflow with `word-wrap: break-word` + `overflow-wrap: break-word` + `hyphens: auto`. Card body minimum width removed to prevent horizontal scroll.
+- **Bookmark card layout** — fixed broken bookmark card layout in `/bookmarks`.
+- **Like API bug** — fixed like count desync when toggling on bookmark page.
+- **Edit scrollbar** — profile edit form no longer causes vertical scrollbar jump.
+
+#### SQL driver — Neon `sql` fragment fix
+- **Problem** — Neon's `@neondatabase/serverless` does not support composing `sql` template literal fragments (e.g., `` sql`AND ...` `` inside a larger `sql```...`` ``). This caused silent empty-string interpolation and broken queries.
+- **Fix** — replaced all `sql` fragment composition with a `query(text, $N)` helper that uses contiguous `$1`–`$N` parameter numbering. All dynamic WHERE conditions are built as cumulative string arrays with manually tracked parameter indices.
+- **Files** — `lib/db.ts`: added `query()` wrapper. `app/api/links/route.ts`, `app/api/links/categories/route.ts`: rewrote GET handlers to use `query()` with cumulative WHERE params.
+- **Guard** — added `AND 1=1` placeholder before dynamic conditions to prevent bare-WHERE syntax errors when no filters are active.
+
+#### Profile: Editable username
+- **API** (`PATCH /api/users/profile`) — accepts `username` field with regex validation (`/^[a-z0-9_]{3,30}$/i`), uniqueness check (excluding current user), stores lowercased via `COALESCE`. Re-signs JWT cookie with new username.
+- **Frontend** — username input added to the edit profile form, pre-filled from current profile. On save, auto-redirects to `/profile/{lowercased-username}`.
+- **Case sensitivity fix** — all user lookup routes (`[username]/route.ts`, `[username]/links/route.ts`, `[username]/categories/route.ts`) now use `LOWER(username)` in the WHERE clause to match regardless of stored casing.
+
+#### Profile: Responsive layout
+- **Card grid** (`ScatteredLinks.css`) — breakpoints: default 5 cols → ≤1400px 3 cols → ≤700px 2 cols → ≤500px 1 col.
+- **Header** (`profile.css`) — breakpoints: ≤1100px column layout (avatar stacked, buttons below stats) with centered text; ≤768px smaller avatar (72px) and padding; ≤480px compact avatar (60px), tighter spacing.
+
+#### Profile: Topic filter
+- **Filter by topic** — fetches topic types from `/api/links/topics` and renders a collapsible chip bar on the profile page. Selecting a topic scopes both the API endpoint (`topicType`) and the categories fetch to that topic type.
+- **Categories scoped** — the categories (domain filter) re-fetches whenever the active topic type changes.
+- **Pagination reset** — `ScatteredLinks` keyed on `apiEndpoint` so page resets on any filter change.
+
+#### Sidebar duplicate key fix
+- **Collapsed mode** — two nav items had `id: 'users'` (Discover > Users and Admin > Users) causing React key collision. Changed collapsed nav keys to `${section}-${item.id}` for uniqueness.
 
 ### 2026-07-20
 - **Auth persistence** — session now survives dev-server restarts; added card navigation loader and unified search card styling (`a539aab`).
