@@ -23,7 +23,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
 
   const uid = session?.user_id ?? null;
 
-  const topicFilter = topic ? sql`AND l.topic_id = (SELECT id FROM topics WHERE slug = ${topic})` : sql``;
+  const topicFilter = topic ? sql`AND l.topic_id = (SELECT id FROM topics WHERE slug = ${topic})` : sql`AND 1=1`;
 
   let rows: any[] = [];
   let total = 0;
