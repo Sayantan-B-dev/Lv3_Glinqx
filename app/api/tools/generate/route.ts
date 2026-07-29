@@ -14,7 +14,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
   ].filter((k): k is string => !!k && k.startsWith('sk-or-'));
 
   if (keys.length === 0) {
-    return NextResponse.json({ error: 'No valid API keys configured' }, { status: 500 });
+    return NextResponse.json({ error: 'API keys not configured — add OPENROUTER_API_KEY_{1,2,3} to Vercel env' }, { status: 500 });
   }
 
   const prompt = `You are a content analyzer. Given a description text, generate a concise title (max 10 words), a topic (one phrase, max 8 words), and 3-5 relevant tags.

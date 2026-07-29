@@ -8,105 +8,98 @@ export interface ParseResult {
   domain: string;
 }
 
-function extractAttrValue(tag: string, attr: string): string {
-  const m = tag.match(new RegExp(`${attr}=(["'])(.*?)\\1`, 'i'));
-  return m ? m[2] : '';
-}
-
-function extractMetaAttribute(html: string, property: string): string {
+function buildMetaMap(html: string): Map<string, string> {
+  const map = new Map<string, string>();
   const metaRegex = /<meta[\s>][^>]*>/gi;
   let match: RegExpExecArray | null;
   while ((match = metaRegex.exec(html)) !== null) {
     const tag = match[0];
-    const propVal = extractAttrValue(tag, 'property') || extractAttrValue(tag, 'name');
-    if (propVal.toLowerCase() !== property.toLowerCase()) continue;
-    const val = extractAttrValue(tag, 'content');
-    if (val) return val;
+    const key = tag.match(/(?:property|name)=(["'])(.*?)\1/i)?.[2];
+    const val = tag.match(/content=(["'])(.*?)\1/i)?.[2];
+    if (key && val) map.set(key.toLowerCase(), val);
   }
-  return '';
+  return map;
+}
+
+function extractTitle(html: string): string {
+  return html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || '';
+}
+
+function extractJSONLD(html: string): { title?: string; description?: string } {
+  const m = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
+  if (!m) return {};
+  try {
+    const ld = JSON.parse(m[1]);
+    return { title: ld.name || ld.headline || ld.title, description: ld.description };
+  } catch { return {}; }
+}
+
+function extractYouTube(html: string): { title?: string; description?: string } {
+  const m = html.match(/ytInitialPlayerResponse\s*=\s*({.*?});/);
+  if (!m) return {};
+  try {
+    const yt = JSON.parse(m[1]);
+    return { title: yt.videoDetails?.title, description: yt.videoDetails?.shortDescription };
+  } catch { return {}; }
 }
 
 export async function parseOGMetadata(url: string): Promise<ParseResult> {
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(6000),
       redirect: 'follow',
     });
 
     if (!res.ok) {
-      const domain = new URL(url).hostname;
-      return { title: fallbackTitle(url) || url, description: '', image: '', domain };
+      return { title: fallbackTitle(url) || url, description: '', image: '', domain: new URL(url).hostname };
     }
+
     const text = await res.text();
-    const html = text.slice(0, 700000);
+    const html = text.slice(0, 150000);
+    const meta = buildMetaMap(html);
+    const domain = new URL(url).hostname;
 
-    let title =
-      extractMetaAttribute(html, 'og:title') ||
-      extractMetaAttribute(html, 'twitter:title') ||
-      extractMetaAttribute(html, 'title') ||
-      html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ||
-      '';
+    const get = (...keys: string[]) => {
+      for (const k of keys) { const v = meta.get(k); if (v) return v; }
+      return '';
+    };
 
-    let description =
-      extractMetaAttribute(html, 'og:description') ||
-      extractMetaAttribute(html, 'twitter:description') ||
-      extractMetaAttribute(html, 'description') ||
-      '';
+    let title = get('og:title', 'twitter:title') || extractTitle(html);
+    let description = get('og:description', 'twitter:description', 'description');
 
-    const rawImage =
-      extractMetaAttribute(html, 'og:image') ||
-      extractMetaAttribute(html, 'og:image:secure_url') ||
-      extractMetaAttribute(html, 'twitter:image') ||
-      '';
+    const rawImage = get('og:image', 'og:image:secure_url', 'twitter:image');
     const image = rawImage ? new URL(rawImage, url).href : '';
 
-    // Fallback: JSON-LD structured data
     if (!title) {
-      const jsonMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
-      if (jsonMatch) {
-        try {
-          const ld = JSON.parse(jsonMatch[1]);
-          title = ld.name || ld.headline || ld.title || '';
-          description = description || ld.description || '';
-        } catch {}
-      }
+      const ld = extractJSONLD(html);
+      title = ld.title || '';
+      description = description || ld.description || '';
     }
 
-    // Fallback: YouTube ytInitialPlayerResponse
     if (!title) {
-      const ytMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.*?});/);
-      if (ytMatch) {
-        try {
-          const yt = JSON.parse(ytMatch[1]);
-          title = yt.videoDetails?.title || '';
-          description = description || yt.videoDetails?.shortDescription || '';
-        } catch {}
-      }
+      const yt = extractYouTube(html);
+      title = yt.title || '';
+      description = description || yt.description || '';
     }
 
-    const domain = new URL(url).hostname;
-
-    let finalTitle = title || '';
-    let finalDesc = description || '';
-
-    // Platform-specific oEmbed fallback for JS-rendered sites
-    if (!finalTitle) {
+    if (!title) {
       const oembed = await fetchOEmbed(url);
       if (oembed) {
-        finalTitle = oembed.title;
-        finalDesc = finalDesc || oembed.description;
+        title = oembed.title;
+        description = description || oembed.description || '';
       }
     }
 
-    // Fallback to a readable platform name
-    if (!finalTitle) {
-      finalTitle = fallbackTitle(url) || url;
-    }
+    if (!title) title = fallbackTitle(url) || url;
 
-    return { title: decodeHtmlEntities(finalTitle), description: finalDesc ? decodeHtmlEntities(finalDesc) : '', image, domain };
+    return {
+      title: decodeHtmlEntities(title),
+      description: description ? decodeHtmlEntities(description) : '',
+      image,
+      domain,
+    };
   } catch {
-    const domain = new URL(url).hostname;
-    return { title: fallbackTitle(url) || url, description: '', image: '', domain };
+    return { title: fallbackTitle(url) || url, description: '', image: '', domain: new URL(url).hostname };
   }
 }

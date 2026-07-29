@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useToast } from '@/context/ToastContext';
 
 interface AiGenerateResult {
   title: string;
@@ -17,6 +18,7 @@ export default function AiGenerateModal({ onGenerated, onCancel }: AiGenerateMod
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { addToast } = useToast();
 
   useEffect(() => {
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -37,9 +39,12 @@ export default function AiGenerateModal({ onGenerated, onCancel }: AiGenerateMod
           description: data.topic,
           tags: data.tags.join(', '),
         });
+      } else {
+        const err = await res.json().catch(() => ({ error: 'Request failed' }));
+        addToast(err.error || 'AI generation failed', 'error');
       }
     } catch {
-      // silent — caller handles toast
+      addToast('Network error — AI generation failed', 'error');
     } finally {
       setLoading(false);
     }
