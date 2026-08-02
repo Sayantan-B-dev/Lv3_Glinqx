@@ -18,6 +18,10 @@ export const GET = apiHandler(async (req: NextRequest) => {
                SELECT 1 FROM link_likes ll
                WHERE ll.link_id = l.id AND ll.user_id = ${uid}
              ) AS liked_by_user,
+             EXISTS (
+               SELECT 1 FROM saved_links sl
+               WHERE sl.link_id = l.id AND sl.user_id = ${uid}
+             ) AS bookmarked_by_user,
              (SELECT ARRAY_AGG(t.name) FROM link_tags lt JOIN tags t ON lt.tag_id = t.id WHERE lt.link_id = l.id) as tags
       FROM links l
       JOIN users u ON l.user_id = u.id
@@ -34,6 +38,10 @@ export const GET = apiHandler(async (req: NextRequest) => {
                  SELECT 1 FROM link_likes ll
                  WHERE ll.link_id = l.id AND ll.user_id = ${uid}
                ) AS liked_by_user,
+               EXISTS (
+                 SELECT 1 FROM saved_links sl
+                 WHERE sl.link_id = l.id AND sl.user_id = ${uid}
+               ) AS bookmarked_by_user,
                (SELECT ARRAY_AGG(t.name) FROM link_tags lt JOIN tags t ON lt.tag_id = t.id WHERE lt.link_id = l.id) as tags
         FROM links l
         JOIN users u ON l.user_id = u.id

@@ -72,6 +72,19 @@ export default function RandomPage() {
     }
   };
 
+  const handleBookmark = async () => {
+    if (!link) return;
+    const method = link.bookmarked_by_user ? 'DELETE' : 'POST';
+    const res = await fetch(`/api/links/${link.id}/bookmark`, { method });
+    if (res.status === 401) {
+      router.push(`/login?from=/random`);
+      return;
+    }
+    if (res.ok) {
+      setLink({ ...link, bookmarked_by_user: !link.bookmarked_by_user });
+    }
+  };
+
   return (
     <>
       <Topbar title="Random Discovery" />
@@ -114,6 +127,15 @@ export default function RandomPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.35-1.92-4.25-4.29-4.25-1.69 0-3.15.97-3.85 2.38A4.32 4.32 0 008.86 4C6.48 4 4.5 5.9 4.5 8.25c0 6.03 7.5 10.75 7.5 10.75s9-4.72 9-10.75z" />
                       </svg>
                       {link.like_count ?? 0}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleBookmark(); }}
+                      className={`like-btn ${link.bookmarked_by_user ? 'active' : ''}`}
+                      title={link.bookmarked_by_user ? 'Remove bookmark' : 'Bookmark'}
+                    >
+                      <svg width="14" height="14" fill={link.bookmarked_by_user ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+                      </svg>
                     </button>
                   </div>
                 </div>

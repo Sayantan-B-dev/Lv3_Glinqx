@@ -79,6 +79,9 @@ export const GET = apiHandler(async (req: NextRequest) => {
              EXISTS (
                SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = ${uid}
              ) AS liked_by_user,
+             EXISTS (
+               SELECT 1 FROM saved_links sl WHERE sl.link_id = l.id AND sl.user_id = ${uid}
+             ) AS bookmarked_by_user,
              l.comment_count, l.view_count, l.created_at,
              u.username, u.avatar_url,
              ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags,
@@ -112,6 +115,9 @@ export const GET = apiHandler(async (req: NextRequest) => {
              EXISTS (
                SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = ${uid}
              ) AS liked_by_user,
+             EXISTS (
+               SELECT 1 FROM saved_links sl WHERE sl.link_id = l.id AND sl.user_id = ${uid}
+             ) AS bookmarked_by_user,
              l.comment_count, l.view_count, l.created_at,
              u.username, u.avatar_url,
              ARRAY_AGG(DISTINCT t2.name) FILTER (WHERE t2.name IS NOT NULL) AS tags,
@@ -160,6 +166,9 @@ export const GET = apiHandler(async (req: NextRequest) => {
              EXISTS (
                SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = $${w.params.length + 1}
              ) AS liked_by_user,
+             EXISTS (
+               SELECT 1 FROM saved_links sl WHERE sl.link_id = l.id AND sl.user_id = $${w.params.length + 1}
+             ) AS bookmarked_by_user,
              l.comment_count, l.view_count, l.created_at,
              u.username, u.avatar_url,
              ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags,

@@ -16,7 +16,10 @@ export const GET = apiHandler(async (req: NextRequest, { params }: { params: { n
            ) as tags,
            EXISTS(
              SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = ${session?.user_id ?? ''}
-           ) as liked_by_user
+           ) as liked_by_user,
+           EXISTS(
+             SELECT 1 FROM saved_links sl WHERE sl.link_id = l.id AND sl.user_id = ${session?.user_id ?? ''}
+           ) as bookmarked_by_user
     FROM links l
     JOIN users u ON u.id = l.user_id
     JOIN link_tags lt ON lt.link_id = l.id

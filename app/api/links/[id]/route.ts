@@ -17,6 +17,10 @@ export const GET = apiHandler(async (req: NextRequest, { params }: { params: { i
              SELECT 1 FROM link_likes ll
              WHERE ll.link_id = l.id AND ll.user_id = ${session?.user_id ?? null}
            ) AS liked_by_user,
+           EXISTS (
+             SELECT 1 FROM saved_links sl
+             WHERE sl.link_id = l.id AND sl.user_id = ${session?.user_id ?? null}
+           ) AS bookmarked_by_user,
            l.flagged_count, l.created_at, l.updated_at,
            u.username, u.avatar_url,
             ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags,

@@ -24,6 +24,7 @@ export default function ScatteredLinks({ links: initialLinks, itemsPerPage = 30,
 
   const [serverLinks, setServerLinks] = useState<any[]>([]);
   const [totalItems, setTotalItems] = useState(0);
+  const [bmOverrides, setBmOverrides] = useState<Record<string, boolean>>({});
 
   const isServerSide = !!apiEndpoint;
 
@@ -49,6 +50,7 @@ export default function ScatteredLinks({ links: initialLinks, itemsPerPage = 30,
         if (cancelled) return;
         setServerLinks(data.links || []);
         setTotalItems(data.total || 0);
+        setBmOverrides({});
       } catch (e) {
         console.error('[ScatteredLinks] fetch catch', e);
       } finally {
@@ -99,6 +101,25 @@ export default function ScatteredLinks({ links: initialLinks, itemsPerPage = 30,
   const domain = hoveredLink?.original_url ? new URL(hoveredLink.original_url).hostname : '';
   const previewSrc = !hoveredLink?.preview_image ? FALLBACK_IMG : hoveredLink.preview_image;
 
+  const isBookmarked = (link: any) => bmOverrides[link.id] ?? !!link.bookmarked_by_user;
+
+  const handleBookmark = async (link: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const prevState = isBookmarked(link);
+    setBmOverrides(p => ({ ...p, [link.id]: !prevState }));
+    try {
+      const res = await fetch(`/api/links/${link.id}/bookmark`, { method: prevState ? 'DELETE' : 'POST' });
+      if (res.status === 401) {
+        setBmOverrides(p => ({ ...p, [link.id]: prevState }));
+        router.push(`/login?from=${window.location.pathname}`);
+        return;
+      }
+      if (!res.ok) setBmOverrides(p => ({ ...p, [link.id]: prevState }));
+    } catch {
+      setBmOverrides(p => ({ ...p, [link.id]: prevState }));
+    }
+  };
+
   return (
     <div className="scattered-root">
       <div className="scattered-stage">
@@ -141,6 +162,15 @@ export default function ScatteredLinks({ links: initialLinks, itemsPerPage = 30,
                     </svg>
                     {link.like_count ?? 0}
                   </button>
+                  <button
+                    className={`card-stat${isBookmarked(link) ? ' active' : ''}`}
+                    onClick={(e) => handleBookmark(link, e)}
+                    title={isBookmarked(link) ? 'Remove bookmark' : 'Bookmark'}
+                  >
+                    <svg width="12" height="12" fill={isBookmarked(link) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+                    </svg>
+                  </button>
                   <span className="card-stat">
                     <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
@@ -180,11 +210,21 @@ export default function ScatteredLinks({ links: initialLinks, itemsPerPage = 30,
                 </svg>
                 {hoveredLink.like_count ?? 0}
               </span>
-              <span className="glow-popup-stat">
+<span className="glow-popup-stat">
                 <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
                 </svg>
                 {hoveredLink.comment_count ?? 0}
+              </span>
+              <span
+                className="glow-popup-stat"
+                title={isBookmarked(hoveredLink) ? 'Remove bookmark' : 'Bookmark'}
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => handleBookmark(hoveredLink, e as any)}
+              >
+                <svg width="13" height="13" fill={isBookmarked(hoveredLink) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+                </svg>
               </span>
               <span
                 className="glow-popup-open"

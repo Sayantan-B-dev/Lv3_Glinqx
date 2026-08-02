@@ -11,6 +11,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
     const rows = await sql`
       SELECT l.id, l.title, l.description, l.original_url, l.short_code,
              l.preview_image, l.is_anonymous, l.like_count, l.visibility,
+             EXISTS (SELECT 1 FROM saved_links sl WHERE sl.link_id = l.id AND sl.user_id = ${uid}) AS bookmarked_by_user,
              l.comment_count, l.view_count, l.created_at,
              u.username, u.avatar_url,
              ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags
@@ -33,6 +34,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
     const rows = await sql`
       SELECT l.id, l.title, l.description, l.original_url, l.short_code,
              l.preview_image, l.is_anonymous, l.like_count, l.visibility,
+             EXISTS (SELECT 1 FROM saved_links sl WHERE sl.link_id = l.id AND sl.user_id = ${uid}) AS bookmarked_by_user,
              l.comment_count, l.view_count, l.created_at,
              u.username, u.avatar_url,
              ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags
@@ -53,6 +55,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
   const rows = await sql`
     SELECT l.id, l.title, l.description, l.original_url, l.short_code,
            l.preview_image, l.is_anonymous, l.like_count, l.visibility,
+           EXISTS (SELECT 1 FROM saved_links sl WHERE sl.link_id = l.id AND sl.user_id = ${uid}) AS bookmarked_by_user,
            l.comment_count, l.view_count, l.created_at,
            u.username, u.avatar_url,
            ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags,

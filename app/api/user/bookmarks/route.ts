@@ -24,6 +24,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
            l.preview_image, l.visibility, l.like_count, l.comment_count, l.created_at,
            u.username, u.avatar_url,
            EXISTS (SELECT 1 FROM link_likes ll WHERE ll.link_id = l.id AND ll.user_id = ${session.user_id}) AS liked_by_user,
+           TRUE AS bookmarked_by_user,
            ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL) AS tags
     FROM saved_links sl
     JOIN links l ON l.id = sl.link_id
@@ -31,7 +32,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
     LEFT JOIN link_tags lt ON lt.link_id = l.id
     LEFT JOIN tags t ON t.id = lt.tag_id
     WHERE sl.user_id = ${session.user_id}
-    GROUP BY sl.id, l.id, u.username, u.avatar_url
+    GROUP BY sl.link_id, l.id, sl.created_at, u.username, u.avatar_url
     ORDER BY sl.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;

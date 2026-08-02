@@ -52,25 +52,21 @@ export default function LinkDetailPage({ params }: { params: Promise<{ id: strin
     dataReady.current = false;
 
     try {
-      const [linkRes, commRes, bmRes] = await Promise.all([
+      const [linkRes, commRes] = await Promise.all([
         fetch(`/api/links/${id}`),
         fetch(`/api/comments?link_id=${id}`),
-        user ? fetch(`/api/user/bookmarks`) : Promise.resolve(null),
       ]);
       if (linkRes.ok && commRes.ok) {
         const linkData = await linkRes.json();
         const commData = await commRes.json();
         setLink(linkData?.link);
         setComments(commData.comments);
+        setBookmarked(!!linkData.link.bookmarked_by_user);
         setEditLinkData({
           title: linkData.link.title,
           description: linkData.link.description || ''
         });
         setEditTags((linkData.link.tags ?? []).join(', '));
-        if (bmRes && bmRes.ok) {
-          const bmData = await bmRes.json();
-          setBookmarked(bmData.bookmarks?.some((b: any) => b.id === id) ?? false);
-        }
       }
     } catch (err) {
       console.error('Failed to fetch link details', err);
