@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import Particles from '@/components/react-bits/Particles';
 import { LIMITS } from '@/lib/limits';
+import { readListNavigation, fetchListPage, storeListNavigation } from '@/lib/linknav';
 
 const FALLBACK_IMG = '/fall-back-image.webp';
 
@@ -44,6 +45,9 @@ export default function LinkDetailPage({ params }: { params: Promise<{ id: strin
   const [postingComment, setPostingComment] = useState(false);
   const [postingReply, setPostingReply] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [navPrev, setNavPrev] = useState<string | null>(null);
+  const [navNext, setNavNext] = useState<string | null>(null);
+  const [navLoading, setNavLoading] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -113,6 +117,62 @@ export default function LinkDetailPage({ params }: { params: Promise<{ id: strin
       revealContent();
     }
   }, [loading]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const resolveNav = async () => {
+      const ctx = readListNavigation();
+      if (!ctx) {
+        setNavPrev(null);
+        setNavNext(null);
+        return;
+      }
+      const index = ctx.ids.indexOf(String(id));
+      if (index === -1) {
+        setNavPrev(null);
+        setNavNext(null);
+        return;
+      }
+
+      let prev: string | null = null;
+      let next: string | null = null;
+
+      if (index > 0) {
+        prev = ctx.ids[index - 1];
+      } else if (ctx.page > 1) {
+        const prevPage = await fetchListPage(ctx.api, ctx.page - 1, ctx.pageSize);
+        if (prevPage && prevPage.ids.length > 0) {
+          prev = prevPage.ids[prevPage.ids.length - 1];
+          if (!cancelled) {
+            storeListNavigation(ctx.api, prevPage.ids, ctx.page - 1, ctx.pageSize, prevPage.total);
+          }
+        }
+      }
+
+      if (index < ctx.ids.length - 1) {
+        next = ctx.ids[index + 1];
+      } else if (ctx.page * ctx.pageSize < ctx.total) {
+        const nextPage = await fetchListPage(ctx.api, ctx.page + 1, ctx.pageSize);
+        if (nextPage && nextPage.ids.length > 0) {
+          next = nextPage.ids[0];
+          if (!cancelled) {
+            storeListNavigation(ctx.api, nextPage.ids, ctx.page + 1, ctx.pageSize, nextPage.total);
+          }
+        }
+      }
+
+      if (cancelled) return;
+      setNavPrev(prev);
+      setNavNext(next);
+    };
+    resolveNav();
+    return () => { cancelled = true; };
+  }, [id]);
+
+  const navigateAdjacent = (targetId: string) => {
+    setNavLoading(true);
+    router.push(`/link/${targetId}`);
+  };
 
   const handleUpdateLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -413,13 +473,36 @@ export default function LinkDetailPage({ params }: { params: Promise<{ id: strin
             <Particles
               particleCount={200}
               particleSpread={10}
-              speed={0.1}
+              speed={0.3}
               particleBaseSize={100}
               moveParticlesOnHover
               alphaParticles={false}
               disableRotation={false}
               pixelRatio={1}
             />
+            {navPrev || navNext ? (
+              <div className="link-nav-pill" role="navigation" aria-label="Adjacent links">
+                <button
+                  className={`link-nav-btn${navPrev ? '' : ' disabled'}`}
+                  onClick={() => navPrev && navigateAdjacent(navPrev)}
+                  disabled={!navPrev || navLoading}
+                  title={navPrev ? 'Previous link' : undefined}
+                >
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                  <span>Prev</span>
+                </button>
+                <span className="link-nav-divider" />
+                <button
+                  className={`link-nav-btn${navNext ? '' : ' disabled'}`}
+                  onClick={() => navNext && navigateAdjacent(navNext)}
+                  disabled={!navNext || navLoading}
+                  title={navNext ? 'Next link' : undefined}
+                >
+                  <span>Next</span>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -450,6 +533,6 @@ export default function LinkDetailPage({ params }: { params: Promise<{ id: strin
           danger={true}
         />
       )}
-    </>
+      </>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { storeListNavigation } from '@/lib/linknav';
 
 const FALLBACK_IMG = '/fall-back-image.webp';
 
@@ -133,7 +134,11 @@ export default function ScatteredLinks({ links: initialLinks, itemsPerPage = 30,
           >
             <div
               className={`link-card${navigatingId === link.id ? ' navigating' : ''}`}
-              onClick={() => { setNavigatingId(link.id); router.push(`/link/${link.id}`); }}
+              onClick={() => {
+                setNavigatingId(link.id);
+                if (apiEndpoint) storeListNavigation(apiEndpoint, displayLinks.map((l: any) => String(l.id)), safePage + 1, itemsPerPage, totalItems);
+                router.push(`/link/${link.id}`);
+              }}
             >
               {navigatingId === link.id && (
                 <div className="card-loading-overlay" aria-hidden="true">
