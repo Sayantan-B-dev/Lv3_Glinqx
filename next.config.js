@@ -6,7 +6,7 @@ const nextConfig = {
     ],
   },
   serverExternalPackages: ['@neondatabase/serverless'],
-  allowedDevOrigins: ['192.168.1.3'],
+  allowedDevOrigins: ['192.168.1.5'],
   async headers() {
     return [
       {

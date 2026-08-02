@@ -352,6 +352,30 @@ export default function LinkDetailPage({ params }: { params: Promise<{ id: strin
 
   const previewSrc = imgError || !link.preview_image ? FALLBACK_IMG : link.preview_image;
 
+  const navPill = (navPrev || navNext) ? (
+    <div className="link-nav-pill" role="navigation" aria-label="Adjacent links">
+      <button
+        className={`link-nav-btn${navPrev ? '' : ' disabled'}`}
+        onClick={() => navPrev && navigateAdjacent(navPrev)}
+        disabled={!navPrev || navLoading}
+        title={navPrev ? 'Previous link' : undefined}
+      >
+        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+        <span>Prev</span>
+      </button>
+      <span className="link-nav-divider" />
+      <button
+        className={`link-nav-btn${navNext ? '' : ' disabled'}`}
+        onClick={() => navNext && navigateAdjacent(navNext)}
+        disabled={!navNext || navLoading}
+        title={navNext ? 'Next link' : undefined}
+      >
+        <span>Next</span>
+        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+      </button>
+    </div>
+  ) : null;
+
   return (
     <>
       {showGlobe && <LoadingGlobe />}
@@ -480,31 +504,33 @@ export default function LinkDetailPage({ params }: { params: Promise<{ id: strin
               disableRotation={false}
               pixelRatio={1}
             />
-            {navPrev || navNext ? (
-              <div className="link-nav-pill" role="navigation" aria-label="Adjacent links">
-                <button
-                  className={`link-nav-btn${navPrev ? '' : ' disabled'}`}
-                  onClick={() => navPrev && navigateAdjacent(navPrev)}
-                  disabled={!navPrev || navLoading}
-                  title={navPrev ? 'Previous link' : undefined}
-                >
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                  <span>Prev</span>
-                </button>
-                <span className="link-nav-divider" />
-                <button
-                  className={`link-nav-btn${navNext ? '' : ' disabled'}`}
-                  onClick={() => navNext && navigateAdjacent(navNext)}
-                  disabled={!navNext || navLoading}
-                  title={navNext ? 'Next link' : undefined}
-                >
-                  <span>Next</span>
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                </button>
-              </div>
-            ) : null}
+            {navPill}
           </div>
         </div>
+
+        {navPill && (
+          <div className="link-nav-mobile">
+            <button
+              className={`link-nav-btn${navPrev ? '' : ' disabled'}`}
+              onClick={() => navPrev && navigateAdjacent(navPrev)}
+              disabled={!navPrev || navLoading}
+              title={navPrev ? 'Previous link' : undefined}
+            >
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+              <span>Prev</span>
+            </button>
+            <span className="link-nav-divider" />
+            <button
+              className={`link-nav-btn${navNext ? '' : ' disabled'}`}
+              onClick={() => navNext && navigateAdjacent(navNext)}
+              disabled={!navNext || navLoading}
+              title={navNext ? 'Next link' : undefined}
+            >
+              <span>Next</span>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+        )}
 
         <div className="link-detail-comments">
           <CommentThread
