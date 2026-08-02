@@ -18,6 +18,8 @@ interface ParticlesProps {
   cameraDistance?: number;
   disableRotation?: boolean;
   pixelRatio?: number;
+  autoZoom?: boolean;
+  autoZoomSpeed?: number;
   className?: string;
 }
 
@@ -61,6 +63,9 @@ const vertex = /* glsl */ `
   uniform float uSpread;
   uniform float uBaseSize;
   uniform float uSizeRandomness;
+  uniform float uFly;
+  uniform float uFlySpeed;
+  uniform float uFlyOffset;
   
   varying vec4 vRandom;
   varying vec3 vColor;
@@ -72,17 +77,24 @@ const vertex = /* glsl */ `
     vec3 pos = position * uSpread;
     pos.z *= 10.0;
     
+    if (uFly > 0.5) {
+      float span = uSpread * 10.0;
+      pos.z = mod(pos.z + uFlyOffset + span * 0.5, span) - span * 0.5;
+    }
+    
     vec4 mPos = modelMatrix * vec4(pos, 1.0);
     float t = uTime;
-    mPos.x += sin(t * random.z + 6.28 * random.w) * mix(0.1, 1.5, random.x);
-    mPos.y += sin(t * random.y + 6.28 * random.x) * mix(0.1, 1.5, random.w);
-    mPos.z += sin(t * random.w + 6.28 * random.y) * mix(0.1, 1.5, random.z);
+    mPos.x += sin(t * random.z + 6.28 * random.w) * mix(0.1, 0.6, random.x);
+    mPos.y += sin(t * random.y + 6.28 * random.x) * mix(0.1, 0.6, random.w);
+    mPos.z += sin(t * random.w + 6.28 * random.y) * mix(0.1, 0.6, random.z);
     
     vec4 mvPos = viewMatrix * mPos;
-    if (uSizeRandomness == 0.0) {
+    if (uFly > 0.5) {
+      gl_PointSize = (uBaseSize * (1.0 + uSizeRandomness * (random.x - 0.5))) / max(0.5, length(mvPos.xyz));
+    } else if (uSizeRandomness == 0.0) {
       gl_PointSize = uBaseSize;
     } else {
-      gl_PointSize = (uBaseSize * (1.0 + uSizeRandomness * (random.x - 0.5))) / length(mvPos.xyz);
+      gl_PointSize = (uBaseSize * (1.0 + uSizeRandomness * (random.x - 0.5))) / max(0.5, length(mvPos.xyz));
     }
     
     gl_Position = projectionMatrix * mvPos;
@@ -126,6 +138,8 @@ const Particles: React.FC<ParticlesProps> = ({
   cameraDistance = 20,
   disableRotation = false,
   pixelRatio = 1,
+  autoZoom = false,
+  autoZoomSpeed = 0.01,
   className
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -211,7 +225,10 @@ const Particles: React.FC<ParticlesProps> = ({
         uSpread: { value: particleSpread },
         uBaseSize: { value: particleBaseSize * pixelRatio },
         uSizeRandomness: { value: sizeRandomness },
-        uAlphaParticles: { value: alphaParticles ? 1 : 0 }
+        uAlphaParticles: { value: alphaParticles ? 1 : 0 },
+        uFly: { value: autoZoom ? 1 : 0 },
+        uFlySpeed: { value: autoZoomSpeed },
+        uFlyOffset: { value: 0 }
       },
       transparent: true,
       depthTest: false
@@ -252,7 +269,13 @@ const Particles: React.FC<ParticlesProps> = ({
       lastTime = t;
       elapsed += delta * speed;
 
-      program.uniforms.uTime.value = elapsed * 0.001;
+      camera.position.z = effectiveDist;
+      if (autoZoom) {
+        program.uniforms.uTime.value = elapsed * autoZoomSpeed * 40;
+        program.uniforms.uFlyOffset.value = elapsed * autoZoomSpeed * 4000;
+      } else {
+        program.uniforms.uTime.value = elapsed * 0.001;
+      }
 
       if (moveParticlesOnHover) {
         particles.position.x = -mouseRef.current.x * particleHoverFactor;
@@ -297,7 +320,9 @@ const Particles: React.FC<ParticlesProps> = ({
     sizeRandomness,
     cameraDistance,
     disableRotation,
-    pixelRatio
+    pixelRatio,
+    autoZoom,
+    autoZoomSpeed
   ]);
 
   return <div ref={containerRef} className={'particles-container' + (className ? ' ' + className : '')} />;

@@ -495,14 +495,18 @@ export default function LinkDetailPage({ params }: { params: Promise<{ id: strin
           </div>
           <div className="link-detail-spacer">
             <Particles
-              particleCount={200}
+              particleCount={500}
               particleSpread={10}
-              speed={0.3}
-              particleBaseSize={100}
-              moveParticlesOnHover
+              speed={0.5}
+              particleBaseSize={50}
               alphaParticles={false}
-              disableRotation={false}
+              disableRotation={true}
               pixelRatio={1}
+
+              moveParticlesOnHover
+
+              autoZoom
+              autoZoomSpeed={0.000007}
             />
             {navPill}
           </div>
