@@ -1,0 +1,100 @@
+.tf-dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 22px 16px;
+    text-align: center;
+    cursor: pointer;
+    background: var(--bg-2);
+    transition: border-color var(--t), background var(--t), transform .15s;
+}
+
+.tf-dropzone:hover {
+    border-color: var(--border-md);
+}
+
+.tf-dropzone.dragging {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-2));
+    transform: scale(1.01);
+}
+
+.tf-dropzone.disabled {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+.tf-dropzone-icon {
+    font-size: 26px;
+    color: var(--text-4);
+    margin-bottom: 8px;
+    line-height: 1;
+}
+
+.tf-dropzone-text {
+    font-size: 12px;
+    color: var(--text-2);
+}
+
+.tf-dropzone-sub {
+    font-size: 10px;
+    color: var(--text-4);
+    margin-top: 5px;
+    line-height: 1.5;
+}
+
+.tf-limit-note {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.tf-uploading {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-4);
+}
+
+.tf-file-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.tf-file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+    color: var(--text-2);
+}
+
+.tf-file-size {
+    color: var(--text-4);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.tf-countdown {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #ef4444;
+    animation: tfPulse 1s ease-in-out infinite;
+}
+
+@keyframes tfPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+}

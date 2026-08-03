@@ -24,6 +24,7 @@
 @import './ui/sort.css';
 @import './ui/topic-select.css';
 @import './ui/qr.css';
+@import './ui/temp-file.css';
 @import '../components/react-bits/ScatteredLinks.css';
 
 @import './pages/home.css';
