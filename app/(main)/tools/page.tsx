@@ -205,7 +205,7 @@ export default function Tools() {
           </div>
 
           <div className="tool-card">
-            <h2 className="tool-title">LowWeightFileTransfer</h2>
+            <h2 className="tool-title">Low Weight File Transfer</h2>
             <p className="tool-desc">Share files that self-destruct in 5 minutes. Max 3MB · 1 upload per minute per IP · always served as a download, never executed.</p>
 
             {tfResult ? (

@@ -9,6 +9,7 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 24px;
+    min-width: 0;
 }
 
 .tool-card.disabled {
@@ -21,6 +22,8 @@
     font-weight: 600;
     margin-bottom: 8px;
     color: var(--text);
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .tool-desc {
