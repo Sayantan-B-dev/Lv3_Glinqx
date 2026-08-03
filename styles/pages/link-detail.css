@@ -198,12 +198,19 @@
 
 .short-url-result {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 6px 12px;
   background: var(--bg-2);
   border-radius: 8px;
   border: 1px solid var(--border);
+}
+
+.short-url-result .qr-wrap {
+  flex-basis: 100%;
+  margin: 8px 0 4px;
 }
 
 .short-url-value {

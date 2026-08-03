@@ -7,6 +7,7 @@ import NotificationPanel from '@/components/common/NotificationPanel';
 import ConfirmModal from '@/components/common/ConfirmModal';
 import CommentThread from '@/components/comments/CommentThread';
 import LoadingGlobe from '@/components/common/LoadingGlobe';
+import ShortUrlQR from '@/components/common/ShortUrlQR';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -477,6 +478,7 @@ export default function LinkDetailPage({ params }: { params: Promise<{ id: strin
                           <button onClick={handleCopyShort} className={`short-copy-btn ${copied ? 'copied' : ''}`}>
                             {copied ? 'Copied!' : 'Copy'}
                           </button>
+                          <ShortUrlQR value={shortUrl} />
                         </div>
                       )}
                     </div>

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Topbar from '@/components/common/Topbar';
 import NotificationPanel from '@/components/common/NotificationPanel';
+import ShortUrlQR from '@/components/common/ShortUrlQR';
 import { useToast } from '@/context/ToastContext';
 
 export default function Tools() {
@@ -93,6 +94,7 @@ export default function Tools() {
                     )}
                   </button>
                 </div>
+                <ShortUrlQR value={shortResult.shortUrl} />
               </div>
             )}
           </div>
