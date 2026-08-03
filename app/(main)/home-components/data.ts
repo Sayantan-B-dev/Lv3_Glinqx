@@ -10,7 +10,7 @@ export const FEATURES_DATA = [
   { icon: UsersIcon, title: 'Community', desc: 'Follow users, build a network, and curate your own feed of hand-picked links.' },
   { icon: FlameIcon, title: 'Streaks & Gamification', desc: 'Daily posting streaks, leaderboards, and reputation that rewards quality sharing.' },
   { icon: CalendarIcon, title: 'Daily Dose', desc: 'A curated daily digest of the top 5 links never miss what matters.' },
-  { icon: LinkIcon, title: 'Short URL Tool', desc: 'Generate short, expiring links for easy sharing anywhere on the web.' },
+  { icon: LinkIcon, title: 'Developer Tools', desc: 'Shorten URLs with QR codes, and share files that self-destruct in 5 minutes — free for everyone on the Tools page.' },
   { icon: TagIcon, title: 'Tag Organization', desc: 'Categorize links with tags and explore the web through topic clusters.' },
   { icon: ChartIcon, title: 'Analytics', desc: 'Track views, likes, and clicks on your shared links.' },
 ];
