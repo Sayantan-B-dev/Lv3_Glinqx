@@ -370,7 +370,7 @@ export default function Tools() {
       
       <div id="content">
         <div className="tool-grid">
-          <div className="tool-card">
+          <div className="tool-card" id="url-shortener">
             <h2 className="tool-title">URL Shortener</h2>
             <p className="tool-desc">Create clean, trackable short links for your projects. Expires in 24 hours. Rate-limited: 10/min for guests, 30/min for logged-in users.</p>
             <form onSubmit={handleShorten} className="tool-form">
@@ -420,7 +420,7 @@ export default function Tools() {
             )}
           </div>
 
-          <div className="tool-card">
+          <div className="tool-card" id="file-transfer">
             <h2 className="tool-title">Low Weight File Transfer</h2>
             <p className="tool-desc">Share files that self-destruct in 5 minutes. Max 3MB · 1 upload per minute per IP · always served as a download, never executed.</p>
 
@@ -493,7 +493,7 @@ export default function Tools() {
             )}
           </div>
 
-          <div className="tool-card">
+          <div className="tool-card" id="text-share">
             <h2 className="tool-title">Text Share</h2>
             <p className="tool-desc">Share text that self-destructs in 5 minutes, 1 hour, or 24 hours. 10,000 chars max · 1 share per minute per IP · never indexed, auto-destroyed.</p>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Renderer, Camera, Geometry, Program, Mesh } from 'ogl';
 
 import './Particles.css';
@@ -145,6 +145,17 @@ const Particles: React.FC<ParticlesProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const mouseRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const sizeRef = useRef({ w: 0, h: 0 });
+  const [countScale, setCountScale] = useState(1);
+
+  useEffect(() => {
+    const onResize = () => {
+      const w = window.innerWidth;
+      setCountScale(w < 768 ? 0.6 : w < 1280 ? 0.8 : 1);
+    };
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -190,7 +201,7 @@ const Particles: React.FC<ParticlesProps> = ({
       container.addEventListener('mousemove', handleMouseMove);
     }
 
-    const count = particleCount;
+    const count = Math.max(1, Math.round(particleCount * countScale));
     const positions = new Float32Array(count * 3);
     const randoms = new Float32Array(count * 4);
     const colors = new Float32Array(count * 3);
@@ -322,7 +333,8 @@ const Particles: React.FC<ParticlesProps> = ({
     disableRotation,
     pixelRatio,
     autoZoom,
-    autoZoomSpeed
+    autoZoomSpeed,
+    countScale
   ]);
 
   return <div ref={containerRef} className={'particles-container' + (className ? ' ' + className : '')} />;

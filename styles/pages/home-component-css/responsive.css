@@ -4,6 +4,8 @@
   .hero-inner { flex-direction: column; text-align: center; width: 100%; }
   .hero-actions { justify-content: center; }
   .hero-content { max-width: 100%; }
+  .hero-marquee-btn { width: 100%; justify-content: center; }
+  .hero-marquee-scroll { max-width: none; }
   .hero-stats { flex-direction: row; flex-wrap: wrap; justify-content: center; }
   .hero-stat-card { min-width: 100px; padding: 14px 18px; }
   .about-grid { grid-template-columns: 1fr; }

@@ -5,6 +5,7 @@ import { UIProvider } from '@/context/UIContext';
 import AnimatedBg from '@/components/common/AnimatedBg';
 import { LoadingProvider } from '@/context/LoadingContext';
 import { ToastProvider } from '@/context/ToastContext';
+import { ThemeProvider } from '@/context/ThemeContext';
 import ToastContainer from '@/components/common/ToastContainer';
 // @ts-ignore: CSS side-effect import
 import './globals.css';
@@ -59,9 +60,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <UIProvider>
               <LoadingProvider>
                 <ToastProvider>
-                  <AnimatedBg />
-                  {children}
-                  <ToastContainer />
+                  <ThemeProvider>
+                    <AnimatedBg />
+                    {children}
+                    <ToastContainer />
+                  </ThemeProvider>
                 </ToastProvider>
               </LoadingProvider>
             </UIProvider>
