@@ -11,7 +11,7 @@ Route groups: `(main)` = public/user shell (sidebar+topbar), `admin` = admin she
 - Auth: `login/`, `register/`.
 - Short-link resolver: `s/[code]/`.
 - **(main)** user app: `page.tsx` (home) · `explore/` · `topics/` + `topics/[topic]/` · `tags/` + `tags/[tag]/` · `categories/` + `categories/[category]/` · `link/[id]/` · `submit/` + `submit/bulk/` · `manage/links/` · `profile/` + `profile/[username]/` · `bookmarks/` · `daily-dose/` · `random/` · `leaderboard/` · `users/` · `notifications/` · `settings/` · `tools/` · legal (`privacy`,`terms`,`cookies`).
-- Home is composed of `app/(main)/home-components/*` (Hero, About, Features, HowItWorks, Metrics, Feed, FAQ, Tutorial, CTA, Marquee, Reveal, CounterStat, icons). HowItWorks explains category/topic/tag distinction. Tutorial is a 7-tab platform-wide step-by-step guide.
+- Home is composed of `app/(main)/home-components/*` (Hero, HeroToolsMarquee, About, Features, HowItWorks, Metrics, Feed, FAQ, Tutorial, CTA, Marquee, Reveal, CounterStat, icons). HowItWorks explains category/topic/tag distinction. Tutorial is a 7-tab platform-wide step-by-step guide.
 - **admin**: `layout.tsx` (shell + `navLinks` array — add nav entries here) · `dashboard/` · `users/` · `topics/` · `forbidden/`. Admin charts: `app/admin/components/*` (MetricCard, Sparkline, TrendChart, DualTrendChart, DonutChart, PieChart, HorizBarChart, BucketBar, StatTable, FlaggedPanel, RangeSelector, ChartEmpty). Dashboard is sectioned + range-driven: `/api/admin/stats?range=7|30|90|all` returns gap-filled series; charts show `ChartEmpty` when no data.
 
 ## Shared components — `components/`
@@ -23,7 +23,7 @@ Route groups: `(main)` = public/user shell (sidebar+topbar), `admin` = admin she
 - **react-bits/**: `Particles`, `ScatteredLinks` (each ships its own `.css`).
 
 ## Context providers — `context/`
-`AuthContext` · `ToastContext` (`useToast().addToast(msg, 'success'|'error'|'info')`) · `NotificationContext` · `UIContext` · `MobileMenuContext` · `LoadingContext`. All consumed via `useX()` hooks.
+`AuthContext` · `ToastContext` (`useToast().addToast(msg, 'success'|'error'|'info')`) · `NotificationContext` · `UIContext` · `MobileMenuContext` · `LoadingContext` · `ThemeContext` (`useTheme().theme`, `toggleTheme()`; syncs to `data-theme` via MutationObserver). All consumed via `useX()` hooks.
 
 ## Data layer
 - API routes: `app/api/<resource>/route.ts` wrapped in `apiHandler` (`lib/api-utils.ts`).
