@@ -1,0 +1,73 @@
+.shared-text-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    background: var(--bg);
+}
+
+.shared-text-card {
+    width: 100%;
+    max-width: 640px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-sizing: border-box;
+}
+
+.shared-text-heading {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+}
+
+.shared-text-expiry {
+    font-size: 11px;
+    color: var(--text-4);
+}
+
+.shared-text-content {
+    margin: 0;
+    padding: 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: var(--font);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-2);
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.shared-text-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.shared-text-home {
+    font-size: 12px;
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.shared-text-home:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+    .shared-text-card {
+        padding: 16px;
+    }
+}

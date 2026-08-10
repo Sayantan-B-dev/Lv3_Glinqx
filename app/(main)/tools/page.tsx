@@ -10,6 +10,11 @@ import {
   BLOCKED_TEMP_EXTENSIONS,
   tempFileExt,
 } from '@/lib/tempFileRules';
+import {
+  MAX_SHARED_TEXT_CHARS,
+  TEXT_SHARE_EXPIRY_OPTIONS,
+  formatCountdown,
+} from '@/lib/textShareRules';
 
 interface TempFileResult {
   url: string;
@@ -19,11 +24,10 @@ interface TempFileResult {
   nextUploadAt: string;
 }
 
-function formatClock(totalSeconds: number): string {
-  const s = Math.max(0, Math.floor(totalSeconds));
-  const mm = String(Math.floor(s / 60)).padStart(2, '0');
-  const ss = String(s % 60).padStart(2, '0');
-  return `${mm}:${ss}`;
+interface TextShareResult {
+  url: string;
+  expiresAt: string;
+  nextShareAt: string;
 }
 
 export default function Tools() {
@@ -40,6 +44,14 @@ export default function Tools() {
   const [tfCooldownSecs, setTfCooldownSecs] = useState(0);
   const [tfDestroySecs, setTfDestroySecs] = useState(0);
   const tfInputRef = useRef<HTMLInputElement>(null);
+
+  const [tsText, setTsText] = useState('');
+  const [tsExpiry, setTsExpiry] = useState<string>('5m');
+  const [tsSharing, setTsSharing] = useState(false);
+  const [tsResult, setTsResult] = useState<TextShareResult | null>(null);
+  const [tsCopied, setTsCopied] = useState(false);
+  const [tsCooldownSecs, setTsCooldownSecs] = useState(0);
+  const [tsDestroySecs, setTsDestroySecs] = useState(0);
 
   const handleShorten = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,6 +143,59 @@ export default function Tools() {
     }
   };
 
+  const handleShareText = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (tsSharing || tsCooldownSecs > 0) return;
+    const text = tsText.trim();
+    if (!text) {
+      addToast('Enter some text to share', 'error');
+      return;
+    }
+    if (text.length > MAX_SHARED_TEXT_CHARS) {
+      addToast(`Text must be ${MAX_SHARED_TEXT_CHARS} characters or less`, 'error');
+      return;
+    }
+    setTsSharing(true);
+    try {
+      const res = await fetch('/api/tools/share-text', {
+        method: 'POST',
+        body: JSON.stringify({ content: text, expiry: tsExpiry }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setTsResult(data);
+        setTsDestroySecs(
+          Math.max(1, Math.ceil((new Date(data.expiresAt).getTime() - Date.now()) / 1000))
+        );
+        setTsCooldownSecs(
+          Math.max(0, Math.ceil((new Date(data.nextShareAt).getTime() - Date.now()) / 1000))
+        );
+        addToast('Text shared! It self-destructs soon.', 'success');
+      } else if (res.status === 429 && data.retryAfterMs) {
+        setTsCooldownSecs(Math.ceil(data.retryAfterMs / 1000));
+        addToast('Rate limited — one share per minute', 'error');
+      } else {
+        addToast(data.error || 'Failed to share text', 'error');
+      }
+    } catch (err) {
+      addToast('Failed to share text', 'error');
+    } finally {
+      setTsSharing(false);
+    }
+  };
+
+  const handleCopyTs = async () => {
+    if (!tsResult) return;
+    try {
+      await navigator.clipboard.writeText(tsResult.url);
+      setTsCopied(true);
+      addToast('Text link copied to clipboard', 'success');
+      setTimeout(() => setTsCopied(false), 2000);
+    } catch (err) {
+      addToast('Failed to copy link', 'error');
+    }
+  };
+
   useEffect(() => {
     const t = setInterval(() => {
       if (tfResult) {
@@ -143,10 +208,22 @@ export default function Tools() {
           addToast('File destroyed', 'success');
         }
       }
+      if (tsResult) {
+        const remaining = Math.ceil(
+          (new Date(tsResult.expiresAt).getTime() - Date.now()) / 1000
+        );
+        setTsDestroySecs(remaining > 0 ? remaining : 0);
+        if (remaining <= 0) {
+          setTsResult(null);
+          setTsText('');
+          addToast('Text destroyed', 'success');
+        }
+      }
       setTfCooldownSecs((prev) => (prev > 0 ? prev - 1 : 0));
+      setTsCooldownSecs((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(t);
-  }, [tfResult, addToast]);
+  }, [tfResult, tsResult, addToast]);
 
   const dropzoneDisabled = tfCooldownSecs > 0 || tfUploading;
 
@@ -221,7 +298,7 @@ export default function Tools() {
                 <ShortUrlQR value={tfResult.url} />
                 {tfDestroySecs > 0 && (
                   <div className="tf-countdown">
-                    This file will be destroyed in {formatClock(tfDestroySecs)}
+                    This file will be destroyed in {formatCountdown(tfDestroySecs)}
                   </div>
                 )}
               </div>
@@ -266,11 +343,74 @@ export default function Tools() {
 
                 {tfCooldownSecs > 0 && (
                   <div className="tf-limit-note">
-                    Next request in {formatClock(tfCooldownSecs)}
+                    Next request in {formatCountdown(tfCooldownSecs)}
                   </div>
                 )}
                 {tfUploading && <div className="tf-uploading">Uploading...</div>}
               </>
+            )}
+          </div>
+
+          <div className="tool-card">
+            <h2 className="tool-title">Text Share</h2>
+            <p className="tool-desc">Share text that self-destructs in 5 minutes, 1 hour, or 24 hours. 10,000 chars max · 1 share per minute per IP · never indexed, auto-destroyed.</p>
+
+            {tsResult ? (
+              <div className="tool-result">
+                <div className="result-label">Your text link:</div>
+                <div className="result-expiry">
+                  Expires in {TEXT_SHARE_EXPIRY_OPTIONS.find((o) => o.id === tsExpiry)?.label} · destroys itself automatically
+                </div>
+                <div className="result-box">
+                  <span className="result-link">{tsResult.url}</span>
+                  <button className={`short-copy-btn ${tsCopied ? 'copied' : ''}`} onClick={handleCopyTs}>
+                    {tsCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <ShortUrlQR value={tsResult.url} />
+                {tsDestroySecs > 0 && (
+                  <div className="tf-countdown">
+                    This text will be destroyed in {formatCountdown(tsDestroySecs)}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <form onSubmit={handleShareText} className="tool-form-text">
+                <textarea
+                  className="tool-textarea"
+                  placeholder="Paste or type text to share..."
+                  value={tsText}
+                  onChange={(e) => setTsText(e.target.value)}
+                  maxLength={MAX_SHARED_TEXT_CHARS}
+                  rows={5}
+                  disabled={tsCooldownSecs > 0}
+                />
+                <div className="expiry-options">
+                  {TEXT_SHARE_EXPIRY_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      className={`expiry-btn ${tsExpiry === opt.id ? 'active' : ''}`}
+                      onClick={() => setTsExpiry(opt.id)}
+                      disabled={tsCooldownSecs > 0}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {tsCooldownSecs > 0 && (
+                  <div className="tf-limit-note">
+                    Next request in {formatCountdown(tsCooldownSecs)}
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  className="tool-btn tool-btn-block"
+                  disabled={tsSharing || tsCooldownSecs > 0}
+                >
+                  {tsSharing ? '...' : 'Share Text'}
+                </button>
+              </form>
             )}
           </div>
 

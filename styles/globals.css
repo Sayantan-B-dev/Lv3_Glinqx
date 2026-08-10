@@ -25,6 +25,7 @@
 @import './ui/topic-select.css';
 @import './ui/qr.css';
 @import './ui/temp-file.css';
+@import './ui/shared-text.css';
 @import '../components/react-bits/ScatteredLinks.css';
 
 @import './pages/home.css';

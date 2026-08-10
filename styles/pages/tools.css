@@ -58,6 +58,80 @@
     font-weight: 500;
 }
 
+.tool-form-text {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tool-textarea {
+    width: 100%;
+    min-height: 110px;
+    padding: 10px 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color var(--t);
+}
+
+.tool-textarea:focus {
+    border-color: var(--border-md);
+}
+
+.tool-textarea:disabled {
+    opacity: 0.55;
+}
+
+.expiry-options {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.expiry-btn {
+    flex: 1;
+    min-width: 72px;
+    padding: 8px 10px;
+    font-size: 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-2);
+    color: var(--text-3);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color var(--t), border-color var(--t), background var(--t);
+}
+
+.expiry-btn:hover {
+    border-color: var(--border-md);
+    color: var(--text);
+}
+
+.expiry-btn.active {
+    background: var(--text);
+    color: var(--bg);
+    border-color: var(--text);
+    font-weight: 600;
+}
+
+.expiry-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.tool-btn-block {
+    width: 100%;
+    padding: 10px;
+    justify-content: center;
+}
+
 .tool-result {
     margin-top: 20px;
     padding-top: 20px;
@@ -152,4 +226,5 @@
   .result-box { flex-direction: column; gap: 8px; align-items: stretch; }
   .short-copy-btn { width: 100%; justify-content: center; }
   .tool-card { padding: 16px; }
+  .expiry-btn { min-width: 0; }
 }
