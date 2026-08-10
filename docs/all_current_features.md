@@ -110,6 +110,8 @@
 - **Text Share** — self-destructing text snippets (10k chars max) with expiry choices 5 min / 1 hour / 24 hours; 1 share/min/IP (DB-backed); QR + hour-aware live countdown; text rendered escaped, never indexed
 - **QR everywhere** — `ShortUrlQR` component (qrcode.react) renders a centered 160×160 white-card QR with PNG download; used by all three tools and the link detail page short-URL result
 - **Live countdowns** — "This file/text will be destroyed in MM:SS" and "Next request in MM:SS" (H:MM:SS for ≥1h) ticked from server timestamps; cards reset at expiry
+- **Refresh-proof results** — generated links survive page refreshes via `localStorage` (`lnkzoo_tools_state`); countdowns and rate-limit cooldowns resume correctly from server timestamps; results are destroyed only by their real TTL, never by a refresh
+- **Per-tool reset buttons** — "Shorten another URL" / "Share another file" / "Share another text" clear only that tool's result and storage while other tools keep running; rate-limit cooldown survives the reset
 - **Self-healing links** — expired/missing `/f/[code]` and `/t/[code]` destroy their data on access then 404; cleanup crons run even when nobody visits
 - **Cleanup crons** — `/api/cron/cleanup-temp-files` + `/api/cron/cleanup-shared-texts`, both protected by `x-cron-secret` = `CRON_SECRET`
 - Full docs: `docs/tools.md`, DB queries in `docs/db/`
@@ -171,6 +173,11 @@
 - API route ownership guards (delete/update only own resources)
 
 ## Changelog — 2026-08-10 → present
+
+### 2026-08-10 — Tools persistence, per-tool reset buttons, docs restructure
+- **Refresh-proof tool results** — URL shortener, file transfer, and text share results persist in `localStorage` (`lnkzoo_tools_state`) across page refreshes; destroy countdowns and rate-limit cooldowns resume from server timestamps; entries are purged only at their real TTL. Shortener result now also auto-clears after its 24h expiry.
+- **Per-tool reset buttons** — "Shorten another URL" / "Share another file" / "Share another text" on each result block reset only that tool (result + countdown + storage) while the other tools keep their state; cooldown survives so the fresh form shows "Next request in…".
+- **Docs restructure** — all root docs moved to `docs/` (`git mv`), added `docs/tools.md`, `docs/db/temp-file-transfer.md`, `docs/db/text-share.md`, `docs/index.md`; removed stray `[done]*` `.gitignore` line and tracked the files it was hiding (migrations, notifications route, agent skill library).
 
 ### 2026-08-10 — Developer Tools, QR codes, session UI upgrades
 - **QR codes** — new `ShortUrlQR` component (`qrcode.react`, `qrcode.react` dep) renders a centered fixed-square 160×160 QR in a white card (scans in dark mode) with a "Download QR" PNG button. Shown under the URL Shortener result and the link detail page Short URL result (`56cf613`).

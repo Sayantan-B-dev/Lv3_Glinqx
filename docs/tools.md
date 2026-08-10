@@ -6,6 +6,17 @@ Cards: **URL Shortener** · **Low Weight File Transfer** · **Text Share** · Me
 
 All three share the same result UX: a `.result-box` with the link + Copy button, a `ShortUrlQR` (160×160 white-card QR + "Download QR" PNG export), and live countdowns rendered from server timestamps (`formatCountdown` in `lib/textShareRules.ts` — `MM:SS`, or `H:MM:SS` for ≥ 1 hour).
 
+### Persistence across refresh
+Results survive page refreshes via `localStorage` (`lnkzoo_tools_state`, keyed per tool — last result of each tool). On load, entries whose `expiresAt` has not yet passed are restored with correct state: the destroy countdown resumes from the real server timestamp and the rate-limit cooldown ("Next request in…") restores from the stored `nextAllowedAt`. Expired entries are skipped and purged — results are destroyed only by their actual TTL, never by a refresh. Live destruction (countdown hitting 0) also removes the stored entry.
+
+### "Make another" reset buttons
+Each tool's result has a reset button that clears **only that tool** (result, countdown, storage entry) while other tools keep their state:
+- URL Shortener → **Shorten another URL**
+- Low Weight File Transfer → **Share another file**
+- Text Share → **Share another text**
+
+The rate-limit cooldown survives the reset, so the fresh form still shows "Next request in…" until the server allows another submission.
+
 ---
 
 ## 1. URL Shortener

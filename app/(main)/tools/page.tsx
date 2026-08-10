@@ -30,6 +30,38 @@ interface TextShareResult {
   nextShareAt: string;
 }
 
+interface StoredToolsState {
+  shortener?: { shortUrl: string; expiresAt: string };
+  fileTransfer?: { url: string; expiresAt: string; nextAllowedAt: string };
+  textShare?: { url: string; expiresAt: string; nextAllowedAt: string };
+}
+
+const TOOLS_STATE_KEY = 'lnkzoo_tools_state';
+
+function loadToolsState(): StoredToolsState {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(TOOLS_STATE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return {};
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function saveToolsState(state: StoredToolsState): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(TOOLS_STATE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+function updateToolsState(patch: Partial<StoredToolsState>): void {
+  saveToolsState({ ...loadToolsState(), ...patch });
+}
+
 export default function Tools() {
   const [url, setUrl] = useState('');
   const [shortResult, setShortResult] = useState<any>(null);
@@ -64,6 +96,9 @@ export default function Tools() {
       if (res.ok) {
         const data = await res.json();
         setShortResult(data);
+        updateToolsState({
+          shortener: { shortUrl: data.shortUrl, expiresAt: data.expiresAt },
+        });
         addToast('Short URL created!', 'success');
       } else {
         const data = await res.json().catch(() => ({}));
@@ -117,6 +152,13 @@ export default function Tools() {
         setTfCooldownSecs(
           Math.max(0, Math.ceil((new Date(data.nextUploadAt).getTime() - Date.now()) / 1000))
         );
+        updateToolsState({
+          fileTransfer: {
+            url: data.url,
+            expiresAt: data.expiresAt,
+            nextAllowedAt: data.nextUploadAt,
+          },
+        });
         addToast('File uploaded! It self-destructs in 5 minutes.', 'success');
       } else if (res.status === 429 && data.retryAfterMs) {
         setTfCooldownSecs(Math.ceil(data.retryAfterMs / 1000));
@@ -170,6 +212,13 @@ export default function Tools() {
         setTsCooldownSecs(
           Math.max(0, Math.ceil((new Date(data.nextShareAt).getTime() - Date.now()) / 1000))
         );
+        updateToolsState({
+          textShare: {
+            url: data.url,
+            expiresAt: data.expiresAt,
+            nextAllowedAt: data.nextShareAt,
+          },
+        });
         addToast('Text shared! It self-destructs soon.', 'success');
       } else if (res.status === 429 && data.retryAfterMs) {
         setTsCooldownSecs(Math.ceil(data.retryAfterMs / 1000));
@@ -196,8 +245,35 @@ export default function Tools() {
     }
   };
 
+  const resetShortener = () => {
+    setShortResult(null);
+    updateToolsState({ shortener: undefined });
+  };
+
+  const resetFileTransfer = () => {
+    setTfResult(null);
+    setTfDestroySecs(0);
+    updateToolsState({ fileTransfer: undefined });
+  };
+
+  const resetTextShare = () => {
+    setTsResult(null);
+    setTsDestroySecs(0);
+    setTsText('');
+    updateToolsState({ textShare: undefined });
+  };
+
   useEffect(() => {
     const t = setInterval(() => {
+      if (shortResult) {
+        const remaining = Math.ceil(
+          (new Date(shortResult.expiresAt).getTime() - Date.now()) / 1000
+        );
+        if (remaining <= 0) {
+          setShortResult(null);
+          updateToolsState({ shortener: undefined });
+        }
+      }
       if (tfResult) {
         const remaining = Math.ceil(
           (new Date(tfResult.expiresAt).getTime() - Date.now()) / 1000
@@ -205,6 +281,7 @@ export default function Tools() {
         setTfDestroySecs(remaining > 0 ? remaining : 0);
         if (remaining <= 0) {
           setTfResult(null);
+          updateToolsState({ fileTransfer: undefined });
           addToast('File destroyed', 'success');
         }
       }
@@ -216,6 +293,7 @@ export default function Tools() {
         if (remaining <= 0) {
           setTsResult(null);
           setTsText('');
+          updateToolsState({ textShare: undefined });
           addToast('Text destroyed', 'success');
         }
       }
@@ -223,7 +301,65 @@ export default function Tools() {
       setTsCooldownSecs((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(t);
-  }, [tfResult, tsResult, addToast]);
+  }, [shortResult, tfResult, tsResult, addToast]);
+
+  useEffect(() => {
+    const state = loadToolsState();
+    const now = Date.now();
+    const clean: StoredToolsState = {};
+
+    if (state.shortener && new Date(state.shortener.expiresAt).getTime() > now) {
+      setShortResult({
+        shortUrl: state.shortener.shortUrl,
+        expiresAt: state.shortener.expiresAt,
+      });
+      clean.shortener = state.shortener;
+    }
+
+    if (state.fileTransfer && new Date(state.fileTransfer.expiresAt).getTime() > now) {
+      setTfResult({
+        url: state.fileTransfer.url,
+        fileName: '',
+        sizeBytes: 0,
+        expiresAt: state.fileTransfer.expiresAt,
+        nextUploadAt: state.fileTransfer.nextAllowedAt ?? state.fileTransfer.expiresAt,
+      });
+      setTfDestroySecs(
+        Math.max(1, Math.ceil((new Date(state.fileTransfer.expiresAt).getTime() - now) / 1000))
+      );
+      if (
+        state.fileTransfer.nextAllowedAt &&
+        new Date(state.fileTransfer.nextAllowedAt).getTime() > now
+      ) {
+        setTfCooldownSecs(
+          Math.ceil((new Date(state.fileTransfer.nextAllowedAt).getTime() - now) / 1000)
+        );
+      }
+      clean.fileTransfer = state.fileTransfer;
+    }
+
+    if (state.textShare && new Date(state.textShare.expiresAt).getTime() > now) {
+      setTsResult({
+        url: state.textShare.url,
+        expiresAt: state.textShare.expiresAt,
+        nextShareAt: state.textShare.nextAllowedAt ?? state.textShare.expiresAt,
+      });
+      setTsDestroySecs(
+        Math.max(1, Math.ceil((new Date(state.textShare.expiresAt).getTime() - now) / 1000))
+      );
+      if (
+        state.textShare.nextAllowedAt &&
+        new Date(state.textShare.nextAllowedAt).getTime() > now
+      ) {
+        setTsCooldownSecs(
+          Math.ceil((new Date(state.textShare.nextAllowedAt).getTime() - now) / 1000)
+        );
+      }
+      clean.textShare = state.textShare;
+    }
+
+    saveToolsState(clean);
+  }, []);
 
   const dropzoneDisabled = tfCooldownSecs > 0 || tfUploading;
 
@@ -277,6 +413,9 @@ export default function Tools() {
                   </button>
                 </div>
                 <ShortUrlQR value={shortResult.shortUrl} />
+                <button type="button" className="tool-again-btn" onClick={resetShortener}>
+                  Shorten another URL
+                </button>
               </div>
             )}
           </div>
@@ -301,6 +440,9 @@ export default function Tools() {
                     This file will be destroyed in {formatCountdown(tfDestroySecs)}
                   </div>
                 )}
+                <button type="button" className="tool-again-btn" onClick={resetFileTransfer}>
+                  Share another file
+                </button>
               </div>
             ) : (
               <>
@@ -373,6 +515,9 @@ export default function Tools() {
                     This text will be destroyed in {formatCountdown(tsDestroySecs)}
                   </div>
                 )}
+                <button type="button" className="tool-again-btn" onClick={resetTextShare}>
+                  Share another text
+                </button>
               </div>
             ) : (
               <form onSubmit={handleShareText} className="tool-form-text">
