@@ -103,6 +103,17 @@
 - **Link surfaces** — themed topic badge on cards and link detail page
 - **Admin** — tree manager for the full taxonomy
 
+## Developer Tools (`/tools`)
+- **Fully public** — every tool, API, and QR works without login (guests included)
+- **URL Shortener** — 24h expiring short links (`/s/[code]`), in-memory rate limit (10/min guests, 30/min users), QR code + download under the result
+- **Low Weight File Transfer** — drag-drop or browse files up to 3MB; self-destructs after 5 min; 1 upload/min/IP (DB-backed); always served as a forced download with the original filename; QR + "Download QR"; HTML/SVG/JS blocked with a "zip it" hint
+- **Text Share** — self-destructing text snippets (10k chars max) with expiry choices 5 min / 1 hour / 24 hours; 1 share/min/IP (DB-backed); QR + hour-aware live countdown; text rendered escaped, never indexed
+- **QR everywhere** — `ShortUrlQR` component (qrcode.react) renders a centered 160×160 white-card QR with PNG download; used by all three tools and the link detail page short-URL result
+- **Live countdowns** — "This file/text will be destroyed in MM:SS" and "Next request in MM:SS" (H:MM:SS for ≥1h) ticked from server timestamps; cards reset at expiry
+- **Self-healing links** — expired/missing `/f/[code]` and `/t/[code]` destroy their data on access then 404; cleanup crons run even when nobody visits
+- **Cleanup crons** — `/api/cron/cleanup-temp-files` + `/api/cron/cleanup-shared-texts`, both protected by `x-cron-secret` = `CRON_SECRET`
+- Full docs: `docs/tools.md`, DB queries in `docs/db/`
+
 ## Home Page Sections
 - **Hero** — headline, stats, CTA
 - **Marquee** — trending tags carousel
@@ -159,7 +170,17 @@
 - Consistent error responses (no stack traces leaked)
 - API route ownership guards (delete/update only own resources)
 
-## Changelog — 2026-07-20 → 2026-07-28
+## Changelog — 2026-08-10 → present
+
+### 2026-08-10 — Developer Tools, QR codes, session UI upgrades
+- **QR codes** — new `ShortUrlQR` component (`qrcode.react`, `qrcode.react` dep) renders a centered fixed-square 160×160 QR in a white card (scans in dark mode) with a "Download QR" PNG button. Shown under the URL Shortener result and the link detail page Short URL result (`56cf613`).
+- **Low Weight File Transfer** — public self-destructing file sharing tool: drag-drop/click-browse up to 3MB, Cloudinary `raw` upload (data URI, never touches disk), 5-min TTL, DB-backed 1 upload/min/IP, `GET /f/[code]` proxies the file with the original filename + type as a forced download (`X-Content-Type-Options: nosniff`), type blocklist with "zip it" hint, cleanup cron + lazy prune + self-heal (`54ebe9a`). Renamed from "LowWeightFileTransfer" with mobile hardening — `overflow-wrap`/`word-break` on titles, `min-width: 0` on tool cards (`a4e7a9b`).
+- **Text Share** — public self-destructing text tool: 10k chars, expiry 5 min / 1 hour / 24 hours, DB-backed 1 share/min/IP, `GET /t/[code]` escaped plain-text page with copy button, `cleanup-shared-texts` cron, shared `formatCountdown` (`c98738e`).
+- **Home page** — "Why LnkZoo" card "Short URL Tool" → "Developer Tools" covering the full tools page (`6b8a89c`).
+- **Bookmark everywhere** — bookmark toggle added to every link card surface; fixed bookmarks API `GROUP BY` (`sl.id` → `sl.link_id, l.id, sl.created_at`) (`3a1c2d6`).
+- **Prev/next navigation** — link detail page navigates back/forward within the originating feed list via sessionStorage (`lib/linknav.ts`: `storeListNavigation`, `readListNavigation`, `fetchListPage`); floating pill desktop + fixed bottom bar mobile (`83361e8`, `85bd659`).
+- **Particles fly-through** — new particles variant flies through the viewport on link detail (`uFlyOffset` shader, `autoZoom`/`autoZoomSpeed` props) (`11e89c4`).
+- **Cursor loader** — cursor spins on every click and any in-flight fetch (global `fetch` interception in `context/LoadingContext.tsx`) (`90b5ff3`).
 
 ### 2026-07-22 — OG parser: Facebook fetching, profile links COUNT fix
 - **Fix** — profile links endpoint (`GET /api/users/[username]/links`) was passing `$3`/`$4` (limit/offset) to the `COUNT(*)` query, which only uses `$1`/`$2` (and `$3`/`$4` for domain). Caused PostgreSQL prepared-statement param mismatch errors (`bind message supplies 4 parameters, but prepared statement "" requires 2`). Separated count params with contiguous numbering.
