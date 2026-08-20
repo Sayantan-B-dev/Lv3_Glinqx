@@ -50,6 +50,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
         shortCode: existing.short_code,
         shortUrl: `${appUrl}/s/${existing.short_code}`,
         expiresAt: new Date(new Date(existing.created_at).getTime() + 86400000).toISOString(),
+        serverTime: Date.now(),
       });
     }
 
@@ -64,6 +65,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
         shortCode: expired.short_code,
         shortUrl: `${appUrl}/s/${expired.short_code}`,
         expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        serverTime: Date.now(),
       });
     }
 
@@ -81,6 +83,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
       shortCode: row.short_code,
       shortUrl: `${appUrl}/s/${row.short_code}`,
       expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      serverTime: Date.now(),
     });
   } catch (err) {
     console.error('[POST /api/tools/shorten]', err);

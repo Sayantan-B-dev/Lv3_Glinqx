@@ -22,21 +22,29 @@ interface TempFileResult {
   sizeBytes: number;
   expiresAt: string;
   nextUploadAt: string;
+  clockOffset: number;
 }
 
 interface TextShareResult {
   url: string;
   expiresAt: string;
   nextShareAt: string;
+  clockOffset: number;
 }
 
 interface StoredToolsState {
-  shortener?: { shortUrl: string; expiresAt: string };
-  fileTransfer?: { url: string; expiresAt: string; nextAllowedAt: string };
-  textShare?: { url: string; expiresAt: string; nextAllowedAt: string };
+  shortener?: { shortUrl: string; expiresAt: string; clockOffset: number };
+  fileTransfer?: { url: string; expiresAt: string; nextAllowedAt: string; clockOffset: number };
+  textShare?: { url: string; expiresAt: string; nextAllowedAt: string; clockOffset: number };
 }
 
 const TOOLS_STATE_KEY = 'lnkzoo_tools_state';
+
+const remainingSecs = (expiresAt: string, clockOffset: number): number =>
+  Math.ceil((new Date(expiresAt).getTime() - (Date.now() + clockOffset)) / 1000);
+
+const captureClockOffset = (serverTime: number | undefined): number =>
+  (typeof serverTime === 'number' ? serverTime : Date.now()) - Date.now();
 
 function loadToolsState(): StoredToolsState {
   if (typeof window === 'undefined') return {};
@@ -95,9 +103,10 @@ export default function Tools() {
       });
       if (res.ok) {
         const data = await res.json();
-        setShortResult(data);
+        const clockOffset = captureClockOffset(data.serverTime);
+        setShortResult({ ...data, clockOffset });
         updateToolsState({
-          shortener: { shortUrl: data.shortUrl, expiresAt: data.expiresAt },
+          shortener: { shortUrl: data.shortUrl, expiresAt: data.expiresAt, clockOffset },
         });
         addToast('Short URL created!', 'success');
       } else {
@@ -145,18 +154,20 @@ export default function Tools() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setTfResult(data);
+        const clockOffset = captureClockOffset(data.serverTime);
+        setTfResult({ ...data, clockOffset });
         setTfDestroySecs(
-          Math.max(1, Math.ceil((new Date(data.expiresAt).getTime() - Date.now()) / 1000))
+          Math.max(1, remainingSecs(data.expiresAt, clockOffset))
         );
         setTfCooldownSecs(
-          Math.max(0, Math.ceil((new Date(data.nextUploadAt).getTime() - Date.now()) / 1000))
+          Math.max(0, remainingSecs(data.nextUploadAt, clockOffset))
         );
         updateToolsState({
           fileTransfer: {
             url: data.url,
             expiresAt: data.expiresAt,
             nextAllowedAt: data.nextUploadAt,
+            clockOffset,
           },
         });
         addToast('File uploaded! It self-destructs in 5 minutes.', 'success');
@@ -205,18 +216,20 @@ export default function Tools() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setTsResult(data);
+        const clockOffset = captureClockOffset(data.serverTime);
+        setTsResult({ ...data, clockOffset });
         setTsDestroySecs(
-          Math.max(1, Math.ceil((new Date(data.expiresAt).getTime() - Date.now()) / 1000))
+          Math.max(1, remainingSecs(data.expiresAt, clockOffset))
         );
         setTsCooldownSecs(
-          Math.max(0, Math.ceil((new Date(data.nextShareAt).getTime() - Date.now()) / 1000))
+          Math.max(0, remainingSecs(data.nextShareAt, clockOffset))
         );
         updateToolsState({
           textShare: {
             url: data.url,
             expiresAt: data.expiresAt,
             nextAllowedAt: data.nextShareAt,
+            clockOffset,
           },
         });
         addToast('Text shared! It self-destructs soon.', 'success');
@@ -266,18 +279,14 @@ export default function Tools() {
   useEffect(() => {
     const t = setInterval(() => {
       if (shortResult) {
-        const remaining = Math.ceil(
-          (new Date(shortResult.expiresAt).getTime() - Date.now()) / 1000
-        );
+        const remaining = remainingSecs(shortResult.expiresAt, shortResult.clockOffset ?? 0);
         if (remaining <= 0) {
           setShortResult(null);
           updateToolsState({ shortener: undefined });
         }
       }
       if (tfResult) {
-        const remaining = Math.ceil(
-          (new Date(tfResult.expiresAt).getTime() - Date.now()) / 1000
-        );
+        const remaining = remainingSecs(tfResult.expiresAt, tfResult.clockOffset ?? 0);
         setTfDestroySecs(remaining > 0 ? remaining : 0);
         if (remaining <= 0) {
           setTfResult(null);
@@ -286,9 +295,7 @@ export default function Tools() {
         }
       }
       if (tsResult) {
-        const remaining = Math.ceil(
-          (new Date(tsResult.expiresAt).getTime() - Date.now()) / 1000
-        );
+        const remaining = remainingSecs(tsResult.expiresAt, tsResult.clockOffset ?? 0);
         setTsDestroySecs(remaining > 0 ? remaining : 0);
         if (remaining <= 0) {
           setTsResult(null);
@@ -305,57 +312,70 @@ export default function Tools() {
 
   useEffect(() => {
     const state = loadToolsState();
-    const now = Date.now();
     const clean: StoredToolsState = {};
 
-    if (state.shortener && new Date(state.shortener.expiresAt).getTime() > now) {
-      setShortResult({
-        shortUrl: state.shortener.shortUrl,
-        expiresAt: state.shortener.expiresAt,
-      });
-      clean.shortener = state.shortener;
+    if (state.shortener) {
+      const off = state.shortener.clockOffset ?? 0;
+      if (new Date(state.shortener.expiresAt).getTime() > Date.now() + off) {
+        setShortResult({
+          shortUrl: state.shortener.shortUrl,
+          expiresAt: state.shortener.expiresAt,
+          clockOffset: off,
+        });
+        clean.shortener = state.shortener;
+      }
     }
 
-    if (state.fileTransfer && new Date(state.fileTransfer.expiresAt).getTime() > now) {
-      setTfResult({
-        url: state.fileTransfer.url,
-        fileName: '',
-        sizeBytes: 0,
-        expiresAt: state.fileTransfer.expiresAt,
-        nextUploadAt: state.fileTransfer.nextAllowedAt ?? state.fileTransfer.expiresAt,
-      });
-      setTfDestroySecs(
-        Math.max(1, Math.ceil((new Date(state.fileTransfer.expiresAt).getTime() - now) / 1000))
-      );
-      if (
-        state.fileTransfer.nextAllowedAt &&
-        new Date(state.fileTransfer.nextAllowedAt).getTime() > now
-      ) {
-        setTfCooldownSecs(
-          Math.ceil((new Date(state.fileTransfer.nextAllowedAt).getTime() - now) / 1000)
+    if (state.fileTransfer) {
+      const off = state.fileTransfer.clockOffset ?? 0;
+      const now = Date.now() + off;
+      if (new Date(state.fileTransfer.expiresAt).getTime() > now) {
+        setTfResult({
+          url: state.fileTransfer.url,
+          fileName: '',
+          sizeBytes: 0,
+          expiresAt: state.fileTransfer.expiresAt,
+          nextUploadAt: state.fileTransfer.nextAllowedAt ?? state.fileTransfer.expiresAt,
+          clockOffset: off,
+        });
+        setTfDestroySecs(
+          Math.max(1, remainingSecs(state.fileTransfer.expiresAt, off))
         );
+        if (
+          state.fileTransfer.nextAllowedAt &&
+          new Date(state.fileTransfer.nextAllowedAt).getTime() > now
+        ) {
+          setTfCooldownSecs(
+            remainingSecs(state.fileTransfer.nextAllowedAt, off)
+          );
+        }
+        clean.fileTransfer = state.fileTransfer;
       }
-      clean.fileTransfer = state.fileTransfer;
     }
 
-    if (state.textShare && new Date(state.textShare.expiresAt).getTime() > now) {
-      setTsResult({
-        url: state.textShare.url,
-        expiresAt: state.textShare.expiresAt,
-        nextShareAt: state.textShare.nextAllowedAt ?? state.textShare.expiresAt,
-      });
-      setTsDestroySecs(
-        Math.max(1, Math.ceil((new Date(state.textShare.expiresAt).getTime() - now) / 1000))
-      );
-      if (
-        state.textShare.nextAllowedAt &&
-        new Date(state.textShare.nextAllowedAt).getTime() > now
-      ) {
-        setTsCooldownSecs(
-          Math.ceil((new Date(state.textShare.nextAllowedAt).getTime() - now) / 1000)
+    if (state.textShare) {
+      const off = state.textShare.clockOffset ?? 0;
+      const now = Date.now() + off;
+      if (new Date(state.textShare.expiresAt).getTime() > now) {
+        setTsResult({
+          url: state.textShare.url,
+          expiresAt: state.textShare.expiresAt,
+          nextShareAt: state.textShare.nextAllowedAt ?? state.textShare.expiresAt,
+          clockOffset: off,
+        });
+        setTsDestroySecs(
+          Math.max(1, remainingSecs(state.textShare.expiresAt, off))
         );
+        if (
+          state.textShare.nextAllowedAt &&
+          new Date(state.textShare.nextAllowedAt).getTime() > now
+        ) {
+          setTsCooldownSecs(
+            remainingSecs(state.textShare.nextAllowedAt, off)
+          );
+        }
+        clean.textShare = state.textShare;
       }
-      clean.textShare = state.textShare;
     }
 
     saveToolsState(clean);

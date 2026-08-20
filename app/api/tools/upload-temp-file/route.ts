@@ -68,7 +68,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
       ip
     );
 
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, serverTime: Date.now() });
   } catch (err) {
     console.error('[POST /api/tools/upload-temp-file]', err);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });

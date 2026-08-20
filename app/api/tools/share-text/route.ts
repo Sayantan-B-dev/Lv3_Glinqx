@@ -43,7 +43,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
     const result = await createTextShare(content.trim(), option.seconds, ip);
 
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, serverTime: Date.now() });
   } catch (err) {
     console.error('[POST /api/tools/share-text]', err);
     return NextResponse.json({ error: 'Failed to share text' }, { status: 500 });
